@@ -16,6 +16,11 @@
 #ifndef DECANSTRUCTOR2__DECANSTRUCTOR2_GUI_HPP_
 #define DECANSTRUCTOR2__DECANSTRUCTOR2_GUI_HPP_
 
+#include <SFGUI/SFGUI.hpp>
+#include <SFGUI/Widgets.hpp>
+
+#include <SFML/Graphics.hpp>
+
 namespace DeCANstructor2
 {
 

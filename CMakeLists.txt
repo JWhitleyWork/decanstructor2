@@ -13,6 +13,8 @@ endif()
 find_package(ament_cmake_auto REQUIRED)
 ament_auto_find_build_dependencies()
 
+find_package(SFGUI REQUIRED)
+
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/CanEvent.msg"
   DEPENDENCIES builtin_interfaces
@@ -34,6 +36,10 @@ foreach(rmw_implementation ${rmw_implementations2})
     target_link_libraries(${PROJECT_NAME}_node "${cpp_typesupport_target}")
   endforeach()
 endforeach()
+
+target_link_libraries(${PROJECT_NAME}_node
+  SFGUI::SFGUI
+)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
