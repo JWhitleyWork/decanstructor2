@@ -1,4 +1,4 @@
-// Copyright 2023 Joshua Whitley
+// Copyright 2025 Joshua Whitley
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy of this
 // software and associated documentation files (the "Software"), to deal in the Software
@@ -15,11 +15,33 @@
 
 #include "decanstructor2/decanstructor2_gui.hpp"
 
+#include <optional>
+
 namespace DeCANstructor2
 {
 
 DC2App::DC2App()
+: window_(sf::VideoMode(800, 600), "DeCANstructor2"),
+  gui_(window_)
 {
+  is_open_.store(true);
+
+  while (window_.isOpen()) {
+    sf::Event event;
+    while (window_.pollEvent(event)) {
+      gui_.handleEvent(event);
+
+      if (event.type == sf::Event::Closed) {
+        window_.close();
+      }
+    }
+
+    window_.clear();
+    gui_.draw();
+    window_.display();
+  }
+
+  is_open_.store(false);
 }
 
 }  // namespace DeCANstructor2

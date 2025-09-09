@@ -1,4 +1,4 @@
-// Copyright 2023 Joshua Whitley
+// Copyright 2025 Joshua Whitley
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy of this
 // software and associated documentation files (the "Software"), to deal in the Software
@@ -18,6 +18,8 @@
 
 #include <rclcpp/rclcpp.hpp>
 
+#include "decanstructor2/decanstructor2_gui.hpp"
+
 namespace DeCANstructor2
 {
 
@@ -25,6 +27,12 @@ class DC2RosNode : public rclcpp::Node
 {
 public:
   explicit DC2RosNode(const rclcpp::NodeOptions & options);
+  ~DC2RosNode() = default;
+
+private:
+  DC2App app_;
+
+  rclcpp::TimerBase::SharedPtr main_loop_timer_;
 };
 
 }  // namespace DeCANstructor2

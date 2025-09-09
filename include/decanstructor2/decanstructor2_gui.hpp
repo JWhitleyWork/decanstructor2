@@ -1,4 +1,4 @@
-// Copyright 2023 Joshua Whitley
+// Copyright 2025 Joshua Whitley
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy of this
 // software and associated documentation files (the "Software"), to deal in the Software
@@ -16,10 +16,10 @@
 #ifndef DECANSTRUCTOR2__DECANSTRUCTOR2_GUI_HPP_
 #define DECANSTRUCTOR2__DECANSTRUCTOR2_GUI_HPP_
 
-#include <SFGUI/SFGUI.hpp>
-#include <SFGUI/Widgets.hpp>
+#include <atomic>
 
-#include <SFML/Graphics.hpp>
+#include <TGUI/TGUI.hpp>
+#include <TGUI/Backend/SFML-Graphics.hpp>
 
 namespace DeCANstructor2
 {
@@ -28,6 +28,13 @@ class DC2App
 {
 public:
   DC2App();
+  bool is_open() const { return is_open_.load(); }
+
+private:
+  std::atomic<bool> is_open_;
+
+  sf::RenderWindow window_;
+  tgui::Gui gui_;
 };
 
 }  // namespace DeCANstructor2
