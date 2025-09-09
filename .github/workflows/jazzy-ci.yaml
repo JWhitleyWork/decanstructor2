@@ -9,7 +9,7 @@ jobs:
   build-ros2-jazzy:
     runs-on: ubuntu-latest
     container:
-      image: rostooling/setup-ros-docker:ubuntu-noble-ros-jazzy-desktop
+      image: rostooling/setup-ros-docker:ubuntu-noble-ros-jazzy-desktop-latest
     steps:
       - name: Run Tests
         id: jazzy_action_ros_ci_step
