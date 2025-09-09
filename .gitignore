@@ -33,3 +33,6 @@
 
 # Vim
 *.swp
+
+# External repos
+src/external/*
