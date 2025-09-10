@@ -22,10 +22,10 @@ DC2RosNode::DC2RosNode(const rclcpp::NodeOptions & options)
 : rclcpp::Node("decanstructor2_ros_node", options),
   app_(),
   main_loop_timer_(this->create_wall_timer(std::chrono::milliseconds(100), [this]() {
-    if (!app_.is_open()) {
-      rclcpp::shutdown();
-    }
-  }))
+      if (!app_.is_open()) {
+        rclcpp::shutdown();
+      }
+    }))
 {
 }
 

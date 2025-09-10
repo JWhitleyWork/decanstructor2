@@ -28,7 +28,7 @@ class DC2App
 {
 public:
   DC2App();
-  bool is_open() const { return is_open_.load(); }
+  bool is_open() const {return is_open_.load();}
 
 private:
   std::atomic<bool> is_open_;
