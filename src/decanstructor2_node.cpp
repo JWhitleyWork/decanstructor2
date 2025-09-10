@@ -20,13 +20,54 @@ namespace DeCANstructor2
 
 DC2RosNode::DC2RosNode(const rclcpp::NodeOptions & options)
 : rclcpp::Node("decanstructor2_ros_node", options),
-  app_(),
-  main_loop_timer_(this->create_wall_timer(std::chrono::milliseconds(100), [this]() {
-      if (!app_.is_open()) {
-        rclcpp::shutdown();
-      }
-    }))
+  window_(sf::VideoMode(800, 600), "DeCANstructor2"),
+  gui_(window_)
 {
+  build_main_window();
+  main_window_loop();
+  rclcpp::shutdown();
+}
+
+void DC2RosNode::build_main_window()
+{
+  can_msg_list_ = tgui::ListView::create();
+  can_msg_list_->setPosition(10, 10);
+  can_msg_list_->setSize("58%", "parent.bottom - 20");
+  can_msg_list_->setItemHeight(20);
+  can_msg_list_->addColumn("ID", 100.0f);
+
+  for (uint8_t i = 0; i < 8; i++) {
+    can_msg_list_->addColumn(std::to_string(i), 25.0f, tgui::HorizontalAlignment::Center);
+  }
+
+  can_msg_list_->addColumn("Avg Rate (ms)", 100.0f, tgui::HorizontalAlignment::Right);
+
+  for (uint8_t i = 0; i < 50; i++) {
+    can_msg_list_->addItem({"0x12345678", "FF", "24", "C9", "3B", "D2", "56", "97", "DD", "5.0"});
+  }
+
+  gui_.add(can_msg_list_);
+}
+
+void DC2RosNode::main_window_loop()
+{
+  while (window_.isOpen()) {
+    sf::Event event;
+    while (window_.pollEvent(event)) {
+      gui_.handleEvent(event);
+
+      if (event.type == sf::Event::Closed) {
+        window_.close();
+      }
+    }
+
+    window_.clear();
+    gui_.draw();
+    window_.display();
+
+    rclcpp::spin_some(this->get_node_base_interface());
+    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+  }
 }
 
 }  // namespace DeCANstructor2

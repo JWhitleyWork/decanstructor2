@@ -37,7 +37,6 @@ rosidl_generate_interfaces(${PROJECT_NAME}
 )
 
 ament_auto_add_library(${PROJECT_NAME}_node
-  src/decanstructor2_gui.cpp
   src/decanstructor2_node.cpp
 )
 

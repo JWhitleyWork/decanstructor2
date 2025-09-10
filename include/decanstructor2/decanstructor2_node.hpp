@@ -16,9 +16,11 @@
 #ifndef DECANSTRUCTOR2__DECANSTRUCTOR2_NODE_HPP_
 #define DECANSTRUCTOR2__DECANSTRUCTOR2_NODE_HPP_
 
-#include <rclcpp/rclcpp.hpp>
+#include <atomic>
 
-#include "decanstructor2/decanstructor2_gui.hpp"
+#include <rclcpp/rclcpp.hpp>
+#include <TGUI/TGUI.hpp>
+#include <TGUI/Backend/SFML-Graphics.hpp>
 
 namespace DeCANstructor2
 {
@@ -30,9 +32,14 @@ public:
   ~DC2RosNode() = default;
 
 private:
-  DC2App app_;
+  void build_main_window();
+  void main_window_loop();
 
-  rclcpp::TimerBase::SharedPtr main_loop_timer_;
+  sf::RenderWindow window_;
+  tgui::Gui gui_;
+
+  // Main Window Widgets
+  tgui::ListView::Ptr can_msg_list_;
 };
 
 }  // namespace DeCANstructor2
