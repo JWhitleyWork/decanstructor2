@@ -30,6 +30,8 @@ ament_auto_find_build_dependencies()
 
 find_package(TGUI REQUIRED)
 
+set(ROS_DISTRO "$ENV{ROS_DISTRO}")
+
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/CanEvent.msg"
   DEPENDENCIES builtin_interfaces
@@ -64,7 +66,13 @@ if(BUILD_TESTING)
   ament_lint_auto_find_test_dependencies()
 endif()
 
-ament_auto_package(
-  INSTALL_TO_SHARE launch
-  USE_SCOPED_HEADER_INSTALL_DIR
-)
+if(ROS_DISTRO STREQUAL "humble" OR ROS_DISTRO STREQUAL "jazzy")
+  ament_auto_package(
+    INSTALL_TO_SHARE launch
+    USE_SCOPED_HEADER_INSTALL_DIR
+  )
+else()
+  ament_auto_package(
+    INSTALL_TO_SHARE launch
+  )
+endif()
