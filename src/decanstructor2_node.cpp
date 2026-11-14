@@ -1,75 +1,76 @@
 // Copyright 2025 Joshua Whitley
-//
-// Permission is hereby granted, free of charge, to any person obtaining a copy of this
-// software and associated documentation files (the "Software"), to deal in the Software
-// without restriction, including without limitation the rights to use, copy, modify,
-// merge, publish, distribute, sublicense, and/or sell copies of the Software, and to
-// permit persons to whom the Software is furnished to do so.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
-// INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
-// PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-// HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
-// OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
-// SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
+// SPDX-License-Identifier: MIT
 #include "decanstructor2/decanstructor2_node.hpp"
+#include <chrono>
+#include <utility>
 
 namespace DeCANstructor2
 {
+namespace
+{
+std::string source_name(const std::string & topic, const std::string & frame_id)
+{
+  return frame_id.empty() ? topic : topic + " [" + frame_id + "]";
+}
+}  // namespace
 
 DC2RosNode::DC2RosNode(const rclcpp::NodeOptions & options)
-: rclcpp::Node("decanstructor2_ros_node", options),
-  window_(sf::VideoMode(800, 600), "DeCANstructor2"),
-  gui_(window_)
+: rclcpp::Node("decanstructor2_ros_node", options)
 {
-  build_main_window();
-  main_window_loop();
-  rclcpp::shutdown();
-}
-
-void DC2RosNode::build_main_window()
-{
-  can_msg_list_ = tgui::ListView::create();
-  can_msg_list_->setPosition(10, 10);
-  can_msg_list_->setSize("58%", "parent.bottom - 20");
-  can_msg_list_->setItemHeight(20);
-  can_msg_list_->addColumn("ID", 100.0f);
-
-  for (uint8_t i = 0; i < 8; i++) {
-    can_msg_list_->addColumn(std::to_string(i), 25.0f, tgui::HorizontalAlignment::Center);
+  const auto classic_topic = declare_parameter<std::string>("classic_topic", "can_in");
+  const auto fd_topic = declare_parameter<std::string>("fd_topic", "can_fd_in");
+  // Best effort subscribers match both best-effort and reliable CAN publishers.
+  const auto qos = rclcpp::QoS(rclcpp::KeepLast(1000)).best_effort();
+  if (!classic_topic.empty()) {
+    classic_subscription_ = create_subscription<can_msgs::msg::Frame>(
+      classic_topic, qos,
+      [this](const can_msgs::msg::Frame & message) {receive_classic(message);});
   }
-
-  can_msg_list_->addColumn("Avg Rate (ms)", 100.0f, tgui::HorizontalAlignment::Right);
-
-  for (uint8_t i = 0; i < 50; i++) {
-    can_msg_list_->addItem({"0x12345678", "FF", "24", "C9", "3B", "D2", "56", "97", "DD", "5.0"});
-  }
-
-  gui_.add(can_msg_list_);
-}
-
-void DC2RosNode::main_window_loop()
-{
-  while (window_.isOpen()) {
-    sf::Event event;
-    while (window_.pollEvent(event)) {
-      gui_.handleEvent(event);
-
-      if (event.type == sf::Event::Closed) {
-        window_.close();
-      }
-    }
-
-    window_.clear();
-    gui_.draw();
-    window_.display();
-
-    rclcpp::spin_some(this->get_node_base_interface());
-    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+  if (!fd_topic.empty()) {
+    fd_subscription_ = create_subscription<ros2_socketcan_msgs::msg::FdFrame>(
+      fd_topic, qos,
+      [this](const ros2_socketcan_msgs::msg::FdFrame & message) {receive_fd(message);});
   }
 }
 
+void DC2RosNode::reject()
+{
+  ++rejected_frames_;
+  RCLCPP_WARN_THROTTLE(
+    get_logger(), *get_clock(), 5000, "Rejected malformed CAN frame (total: %llu)",
+    static_cast<unsigned long long>(rejected_frames_));
+}
+
+void DC2RosNode::ingest(Frame frame)
+{
+  const auto received_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
+    std::chrono::steady_clock::now().time_since_epoch()).count();
+  if (!model_.ingest(frame, received_ns)) {reject();}
+}
+
+void DC2RosNode::receive_classic(const can_msgs::msg::Frame & message)
+{
+  if (message.dlc > message.data.size()) {reject(); return;}
+  Frame frame;
+  frame.key = {source_name(classic_subscription_->get_topic_name(), message.header.frame_id),
+    message.id, message.is_extended, message.is_error, message.is_rtr, FrameFormat::Classic};
+  frame.length = message.dlc;
+  if (!message.is_rtr) {
+    frame.data.assign(message.data.begin(), message.data.begin() + message.dlc);
+  }
+  ingest(std::move(frame));
+}
+
+void DC2RosNode::receive_fd(const ros2_socketcan_msgs::msg::FdFrame & message)
+{
+  if (message.len > 64 || message.len > message.data.size()) {reject(); return;}
+  Frame frame;
+  frame.key = {source_name(fd_subscription_->get_topic_name(), message.header.frame_id),
+    message.id, message.is_extended, message.is_error, false, FrameFormat::FD};
+  frame.length = message.len;
+  frame.data.assign(message.data.begin(), message.data.begin() + message.len);
+  ingest(std::move(frame));
+}
 }  // namespace DeCANstructor2
 
 #include "rclcpp_components/register_node_macro.hpp"

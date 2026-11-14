@@ -40,6 +40,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
 
 ament_auto_add_library(${PROJECT_NAME}_node
   src/decanstructor2_node.cpp
+  src/frame_model.cpp
 )
 
 get_available_rmw_implementations(rmw_implementations2)
@@ -62,6 +63,9 @@ rclcpp_components_register_node(${PROJECT_NAME}_node
 )
 
 if(BUILD_TESTING)
+  find_package(ament_cmake_gtest REQUIRED)
+  ament_add_gtest(node_test test/node_test.cpp)
+  target_link_libraries(node_test ${PROJECT_NAME}_node)
   find_package(ament_lint_auto REQUIRED)
   ament_lint_auto_find_test_dependencies()
 endif()
