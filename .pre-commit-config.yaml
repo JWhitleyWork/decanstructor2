@@ -19,6 +19,7 @@ repos:
         files: ^(src/frame_model\.cpp|include/decanstructor2/frame_model\.hpp|test/frame_model_test\.cpp|tools/run-model-tests\.sh)$
       - id: shell-syntax
         name: Bash syntax
-        entry: bash -n
+        entry: bash -c 'for file in "$@"; do bash -n -- "$file" || exit; done' --
         language: system
+        require_serial: true
         types: [shell]

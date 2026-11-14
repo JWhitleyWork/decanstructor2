@@ -64,5 +64,6 @@ jobs:
           path: |
             ${{ runner.temp }}/dc2-workspace/log/**
             ${{ runner.temp }}/dc2-workspace/build/**/test_results/**
+            ${{ runner.temp }}/dc2-workspace/build/**/Testing/Temporary/**
             ${{ runner.temp }}/dc2-workspace/build/**/window_test.log
             ${{ runner.temp }}/dc2-workspace/smoke/**

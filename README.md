@@ -85,6 +85,14 @@ metadata only; selecting a frame is not needed to see its payload. The monitor
 holds at most 4096 streams: once full, new streams are rejected while existing
 streams continue.
 
+## Development checks
+
+See [CONTRIBUTING.md](CONTRIBUTING.md#quick-checks) to install the pre-commit
+hook and run fast checks without ROS or Docker. These include repository hygiene,
+YAML/XML and Bash syntax checks, and standalone frame-model unit tests. CI runs
+the same quick checks before the five-distribution ROS build, test and GUI smoke
+matrix; the quick checks do not replace that integration coverage.
+
 ## Scope and limitations
 
 This milestone only receives ROS messages; it does not transmit frames, decode
