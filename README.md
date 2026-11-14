@@ -3,6 +3,27 @@
 DeCANstructor2 is a receive-only ROS 2 monitor for classic CAN and CAN-FD frames.
 The supported distro targets are Humble, Jazzy, Kilted, Lyrical, and Rolling.
 
+## Monitor
+
+![DeCANstructor2 graphite interface showing a classic CAN row and two complete CAN FD byte matrices](docs/screenshots/monitor.png)
+
+*Actual application capture using synthetic ROS messages, not a design mockup.*
+
+The table is designed for spotting payload changes without opening an inspector:
+
+- **Classic CAN:** compact rows with up to eight bytes.
+- **CAN FD:** an always-expanded 8×8 byte matrix in every row, including
+  unselected frames. Unused offsets show `--`, not invented data.
+- **Change highlighting:** individual bytes turn amber for one second after a
+  change. Small hexadecimal row offsets identify positions within an FD payload.
+- **Frame metadata:** select a row to see its source, ID, format and flags in the
+  sidebar; the payload stays in the table.
+
+Count and mean receipt interval remain alongside each payload. The interval is
+measured with a steady clock and is not a bus timestamp. Scroll through longer
+stream lists without collapsing FD payloads. Press **Escape**, close the window,
+or use **Ctrl+C** in the launching terminal to exit.
+
 ## Build
 
 Install ROS 2 for your distro, `git`, `python3-vcstool`, `python3-rosdep`,
