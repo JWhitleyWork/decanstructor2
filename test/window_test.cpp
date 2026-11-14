@@ -58,6 +58,11 @@ TEST(MonitorWindow, UnselectedFdRowsExposeAllBytesAndExpireHighlights)
   EXPECT_EQ(last->getText(), tgui::String("BC"));
   EXPECT_EQ(third_last->getText(), tgui::String("DE"));
   EXPECT_EQ(first_last->getText(), tgui::String("AA"));
+  window.gui().getContainer()->leftMousePressed(
+    third_last->getAbsolutePosition() + tgui::Vector2f{4, 4});
+  window.update(model, 0, 100);
+  EXPECT_NE(window.gui().get<tgui::Label>("selected")->getText().find("/fd3"),
+    tgui::String::npos);
   frame.data[63] = 0xEF;
   ASSERT_TRUE(model.ingest(frame, 200));
   frame.key.source = "/fd2";
@@ -110,7 +115,8 @@ TEST(MonitorWindow, ShortFdAndClassicRemoteHaveNoInventedPayload)
   EXPECT_EQ(metadata.find("AB"), tgui::String::npos);
   EXPECT_NE(window.gui().get<tgui::Label>("status")->getText().find("Rejected: 1"),
     tgui::String::npos);
-  remote_row->leftMousePressed(remote_row->getPosition() + tgui::Vector2f{5, 5});
+  window.gui().getContainer()->leftMousePressed(
+    remote_row->getAbsolutePosition() + tgui::Vector2f{5, 5});
   window.update(model, 1, 100);
   const auto remote_metadata = window.gui().get<tgui::Label>("selected")->getText();
   EXPECT_NE(remote_metadata.find("/remote"), tgui::String::npos);
@@ -146,6 +152,41 @@ TEST(MonitorWindow, ClassicChangesAndEmptyFdAreRepresentedInRow)
   window.update(model, 0, 1000000020);
   EXPECT_EQ(row->get<tgui::Label>("byte1")->getRenderer()->getBackgroundColor(),
     row->get<tgui::Label>("byte0")->getRenderer()->getBackgroundColor());
+}
+
+TEST(MonitorWindow, HeadersTrackColumnsAndNarrowWindowsPreserveCellWidths)
+{
+  DeCANstructor2::FrameModel model;
+  DeCANstructor2::MonitorWindow window;
+  DeCANstructor2::Frame frame;
+  frame.key.format = DeCANstructor2::FrameFormat::FD;
+  frame.length = 64;
+  frame.data.resize(64, 0xAB);
+  ASSERT_TRUE(model.ingest(frame, 100));
+  window.update(model, 0, 100);
+  auto table = window.gui().get<tgui::ScrollablePanel>("frames");
+  auto columns = window.gui().get<tgui::Panel>("columns");
+  ASSERT_TRUE(columns);
+  auto header = columns->get<tgui::Panel>("header");
+  ASSERT_TRUE(header);
+  auto row = table->get<tgui::Panel>("row0");
+  ASSERT_TRUE(row);
+  EXPECT_FLOAT_EQ(header->get<tgui::Label>("id")->getPosition().x,
+    row->get<tgui::Label>("id")->getPosition().x);
+  window.gui().setAbsoluteView({0, 0, 1000, 600});
+  window.update(model, 0, 100);
+  EXPECT_GE(row->getSize().x, 980.f);
+  EXPECT_EQ(table->getHorizontalScrollbar()->getPolicy(), tgui::Scrollbar::Policy::Automatic);
+  table->getHorizontalScrollbar()->setValue(100);
+  window.update(model, 0, 100);
+  EXPECT_FLOAT_EQ(header->getPosition().x, -100.f);
+  for (size_t i = 0; i < 64; ++i) {
+    auto byte = row->get<tgui::Label>("byte" + std::to_string(i));
+    ASSERT_TRUE(byte);
+    EXPECT_EQ(byte->getText(), tgui::String("AB"));
+    EXPECT_GE(byte->getSize().x, 30.f);
+    EXPECT_LE(byte->getPosition().y + byte->getSize().y, row->getSize().y);
+  }
 }
 
 TEST(MonitorWindow, ScrollsLargeModelWithBoundedVisibleWidgets)

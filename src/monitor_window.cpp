@@ -30,6 +30,9 @@ namespace
 const tgui::Color text(229, 231, 230), muted(145, 154, 161), cell(43, 47, 50);
 const tgui::Color absent(101, 108, 112), amber(223, 163, 61);
 constexpr float classic_height = 32, fd_height = 190;
+const char * field_names[] = {"source", "id", "format", "length", "count", "interval"};
+const char * field_positions[] = {"1%", "21%", "32%", "39%", "82%", "90%"};
+const char * field_widths[] = {"19%", "10%", "7%", "5%", "8%", "10%"};
 
 sf::VideoMode monitor_video_mode()
 {
@@ -71,17 +74,38 @@ MonitorWindow::MonitorWindow()
   mode->setPosition("100% - 220", 18);
   gui_.add(mode);
 
-  auto header = label(
-    "SOURCE                  ID             FORMAT    LENGTH         PAYLOAD BYTES"
-    "                          COUNT        MEAN dt (ms)", 13);
-  header->getRenderer()->setTextColor(muted);
-  header->setPosition(20, 61);
-  gui_.add(header);
+  auto columns = tgui::Panel::create();
+  columns->setPosition(12, 55);
+  columns->setSize("100% - 282", 29);
+  columns->getRenderer()->setBackgroundColor(tgui::Color(25, 27, 29));
+  auto header = tgui::Panel::create();
+  header->getRenderer()->setBackgroundColor(tgui::Color(25, 27, 29));
+  columns->add(header, "header");
+  const char * headings[] = {"SOURCE", "ID", "FORMAT", "LEN", "COUNT", "MEAN dt (ms)"};
+  for (size_t n = 0; n < 6; ++n) {
+    auto field = label(headings[n], 12);
+    field->setPosition(field_positions[n], 6);
+    field->setSize(field_widths[n], 22);
+    field->getRenderer()->setTextColor(muted);
+    header->add(field, field_names[n]);
+  }
+  auto payload_heading = label("PAYLOAD BYTES", 12);
+  payload_heading->setPosition("45%", 6);
+  payload_heading->getRenderer()->setTextColor(muted);
+  header->add(payload_heading);
+  gui_.add(columns, "columns");
   frames_ = tgui::ScrollablePanel::create();
   frames_->setPosition(12, 84);
   frames_->setSize("100% - 282", "100% - 126");
   frames_->getRenderer()->setBackgroundColor(tgui::Color(29, 32, 34));
-  frames_->getHorizontalScrollbar()->setPolicy(tgui::Scrollbar::Policy::Never);
+  frames_->getHorizontalScrollbar()->setPolicy(tgui::Scrollbar::Policy::Automatic);
+  auto scrollbar = tgui::Scrollbar::create();
+  scrollbar->getRenderer()->setTrackColor(tgui::Color(29, 32, 34));
+  scrollbar->getRenderer()->setThumbColor(tgui::Color(73, 82, 89));
+  scrollbar->getRenderer()->setThumbColorHover(tgui::Color(99, 112, 122));
+  scrollbar->getRenderer()->setArrowBackgroundColor(tgui::Color(29, 32, 34));
+  scrollbar->getRenderer()->setArrowColor(muted);
+  frames_->getRenderer()->setScrollbar(scrollbar->getRenderer()->getData());
   gui_.add(frames_, "frames");
 
   auto detail_title = label("FRAME METADATA", 15);
@@ -144,7 +168,11 @@ void MonitorWindow::update(const FrameModel & model, uint64_t rejected, int64_t 
   }
   const float total = row_keys_.empty() ? 0 : row_offsets_.back() +
     (row_keys_.back().format == FrameFormat::FD ? fd_height : classic_height);
-  frames_->setContentSize({std::max(1.f, frames_->getSize().x - 20), std::max(1.f, total)});
+  const float content_width = std::max(980.f, frames_->getSize().x - 20);
+  frames_->setContentSize({content_width, std::max(1.f, total)});
+  auto header = gui_.get<tgui::Panel>("columns")->get<tgui::Panel>("header");
+  header->setSize(content_width, 29);
+  header->setPosition(-static_cast<float>(frames_->getHorizontalScrollbar()->getValue()), 0);
   const float scroll = static_cast<float>(frames_->getVerticalScrollbar()->getValue());
   auto start = std::upper_bound(row_offsets_.begin(), row_offsets_.end(), scroll);
   const size_t begin = start == row_offsets_.begin() ? 0 :
@@ -160,17 +188,22 @@ void MonitorWindow::update(const FrameModel & model, uint64_t rejected, int64_t 
       const bool fd = row_keys_[index].format == FrameFormat::FD;
       auto row = tgui::Panel::create();
       row->setPosition(0, row_offsets_[index]);
-      row->setSize("100%", fd ? fd_height : classic_height);
+      row->setSize(content_width, fd ? fd_height : classic_height);
       row->onMousePress([this, index] {select_row(index);});
       frames_->add(row, "row" + std::to_string(index));
-      const char * names[] = {"source", "id", "format", "length", "count", "interval"};
-      const char * positions[] = {"1%", "21%", "32%", "39%", "82%", "90%"};
-      const char * widths[] = {"19%", "10%", "7%", "5%", "8%", "10%"};
       for (size_t n = 0; n < 6; ++n) {
         auto field = label("");
-        field->setPosition(positions[n], 7);
-        field->setSize(widths[n], 22);
-        row->add(field, names[n]);
+        field->setPosition(field_positions[n], 7);
+        field->setSize(field_widths[n], 22);
+        row->add(field, field_names[n]);
+      }
+      if (fd) {
+        for (size_t i = 0; i < 8; ++i) {
+          auto offset = label(hex(i * 8, 2), 11);
+          offset->setPosition("43%", static_cast<float>(7 + i * 23));
+          offset->getRenderer()->setTextColor(muted);
+          row->add(offset);
+        }
       }
       const size_t bytes = fd ? 64 : 8;
       for (size_t i = 0; i < bytes; ++i) {
@@ -187,6 +220,7 @@ void MonitorWindow::update(const FrameModel & model, uint64_t rejected, int64_t 
     const auto & state = model.rows().at(row_keys_[index]);
     const auto & frame = state.frame;
     auto row = frames_->get<tgui::Panel>("row" + std::to_string(index));
+    row->setSize(content_width, frame.key.format == FrameFormat::FD ? fd_height : classic_height);
     row->getRenderer()->setBackgroundColor(index == selected_index_ ?
       tgui::Color(41, 56, 67) : tgui::Color(33, 36, 38));
     row->get<tgui::Label>("source")->setText(frame.key.source);
