@@ -168,6 +168,8 @@ TEST(MonitorWindow, HeadersTrackColumnsAndNarrowWindowsPreserveCellWidths)
   frame.length = 64;
   frame.data.resize(64, 0xAB);
   ASSERT_TRUE(model.ingest(frame, 100));
+  frame.key.source = "/second";
+  ASSERT_TRUE(model.ingest(frame, 100));
   window.update(model, 0, 100);
   auto table = window.gui().get<tgui::ScrollablePanel>("frames");
   auto columns = window.gui().get<tgui::Panel>("columns");
@@ -176,22 +178,35 @@ TEST(MonitorWindow, HeadersTrackColumnsAndNarrowWindowsPreserveCellWidths)
   ASSERT_TRUE(header);
   auto row = table->get<tgui::Panel>("row0");
   ASSERT_TRUE(row);
-  const auto header_x = header->get<tgui::Label>("id")->getPosition().x;
-  EXPECT_FLOAT_EQ(header_x, row->get<tgui::Label>("id")->getPosition().x);
-  window.gui().setAbsoluteView({0, 0, 1000, 600});
+  for (const auto width : {1280.f, 1000.f}) {
+    const float height = width == 1280.f ? 800.f : 600.f;
+    window.gui().setAbsoluteView({0, 0, width, height});
+    window.update(model, 0, 100);
+    EXPECT_FLOAT_EQ(
+      header->get<tgui::Label>("id")->getPosition().x,
+      row->get<tgui::Label>("id")->getPosition().x);
+    EXPECT_EQ(table->getHorizontalScrollbar()->getValue(), 0U);
+    EXPECT_LE(row->getSize().x, table->getSize().x - 20);
+    const float viewport_right = table->getPosition().x + table->getSize().x - 20;
+    for (size_t index = 0; index < 2; ++index) {
+      auto fd_row = table->get<tgui::Panel>("row" + std::to_string(index));
+      ASSERT_TRUE(fd_row);
+      for (size_t i = 0; i < 64; ++i) {
+        auto byte = fd_row->get<tgui::Label>("byte" + std::to_string(i));
+        ASSERT_TRUE(byte);
+        EXPECT_EQ(byte->getText(), tgui::String("AB"));
+        EXPECT_GE(byte->getSize().x, 27.f);
+        EXPECT_LE(byte->getAbsolutePosition().x + byte->getSize().x, viewport_right);
+        EXPECT_LE(byte->getPosition().y + byte->getSize().y, fd_row->getSize().y);
+      }
+    }
+  }
+  window.gui().setAbsoluteView({0, 0, 800, 600});
   window.update(model, 0, 100);
-  EXPECT_GE(row->getSize().x, 980.f);
   EXPECT_EQ(table->getHorizontalScrollbar()->getPolicy(), tgui::Scrollbar::Policy::Automatic);
   table->getHorizontalScrollbar()->setValue(100);
   window.update(model, 0, 100);
   EXPECT_FLOAT_EQ(header->getPosition().x, -100.f);
-  for (size_t i = 0; i < 64; ++i) {
-    auto byte = row->get<tgui::Label>("byte" + std::to_string(i));
-    ASSERT_TRUE(byte);
-    EXPECT_EQ(byte->getText(), tgui::String("AB"));
-    EXPECT_GE(byte->getSize().x, 30.f);
-    EXPECT_LE(byte->getPosition().y + byte->getSize().y, row->getSize().y);
-  }
 }
 
 TEST(MonitorWindow, ScrollsLargeModelWithBoundedVisibleWidgets)

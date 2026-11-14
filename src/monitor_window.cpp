@@ -31,8 +31,8 @@ const tgui::Color text(229, 231, 230), muted(145, 154, 161), cell(43, 47, 50);
 const tgui::Color absent(101, 108, 112), amber(223, 163, 61);
 constexpr float classic_height = 32, fd_height = 190;
 const char * field_names[] = {"source", "id", "format", "length", "count", "interval"};
-const char * field_positions[] = {"1%", "21%", "32%", "39%", "82%", "90%"};
-const char * field_widths[] = {"19%", "10%", "7%", "5%", "8%", "10%"};
+const char * field_positions[] = {"1%", "17%", "31%", "39%", "82%", "90%"};
+const char * field_widths[] = {"15%", "14%", "8%", "5%", "8%", "10%"};
 
 sf::VideoMode monitor_video_mode()
 {
@@ -81,7 +81,7 @@ MonitorWindow::MonitorWindow()
   auto header = tgui::Panel::create();
   header->getRenderer()->setBackgroundColor(tgui::Color(25, 27, 29));
   columns->add(header, "header");
-  const char * headings[] = {"SOURCE", "ID", "FORMAT", "LEN", "COUNT", "MEAN dt (ms)"};
+  const char * headings[] = {"SOURCE", "ID", "FORMAT", "LEN", "COUNT", "MEAN ms"};
   for (size_t n = 0; n < 6; ++n) {
     auto field = label(headings[n], 12);
     field->setPosition(field_positions[n], 6);
@@ -170,7 +170,7 @@ void MonitorWindow::update(const FrameModel & model, uint64_t rejected, int64_t 
   }
   const float total = row_keys_.empty() ? 0 : row_offsets_.back() +
     (row_keys_.back().format == FrameFormat::FD ? fd_height : classic_height);
-  const float content_width = std::max(980.f, frames_->getSize().x - 20);
+  const float content_width = std::max(680.f, frames_->getSize().x - 20);
   frames_->setContentSize({content_width, std::max(1.f, total)});
   auto header = gui_.get<tgui::Panel>("columns")->get<tgui::Panel>("header");
   header->setSize(content_width, 29);
