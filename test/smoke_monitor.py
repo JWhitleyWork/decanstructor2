@@ -87,8 +87,10 @@ def main():
                         subprocess.run(
                             ['import', '-window', window, str(output / 'monitor.png')], check=True,
                         )
+                        # Targeted XSendEvent does not change physical key state; the
+                        # window may close on keydown, so do not send it a keyup.
                         subprocess.run(
-                            ['xdotool', 'key', '--window', window, 'Escape'], check=True)
+                            ['xdotool', 'keydown', '--window', window, 'Escape'], check=True)
                     else:
                         os.killpg(process.pid, signal.SIGINT)
                     result = process.wait(timeout=5)
