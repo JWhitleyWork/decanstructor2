@@ -23,6 +23,7 @@
 import os
 from pathlib import Path
 import signal
+import struct
 import subprocess
 import sys
 import time
@@ -84,9 +85,18 @@ def main():
                     wait_until(lambda: '2 streams' in subprocess.check_output(
                         ['xdotool', 'getwindowname', window], text=True))
                     if close_mode == 'escape':
-                        subprocess.run(
-                            ['import', '-window', window, str(output / 'monitor.png')], check=True,
-                        )
+                        # Xvfb has no window manager: SFML 3 may place the client
+                        # partly off-screen, and ImageMagick clips its capture.
+                        subprocess.run(['xdotool', 'windowmove', window, '0', '0'], check=True)
+                        # Allow the exposed portion to be repainted before capture.
+                        time.sleep(0.2)
+                        screenshot = output / 'monitor.png'
+                        subprocess.run(['import', '-window', window, str(screenshot)], check=True)
+                        with screenshot.open('rb') as image:
+                            header = image.read(24)
+                        assert header[:8] == b'\x89PNG\r\n\x1a\n'
+                        assert struct.unpack('>II', header[16:24]) == (1280, 800), (
+                            'screenshot must contain the entire 1280x800 client')
                         # Targeted XSendEvent does not change physical key state; the
                         # window may close on keydown, so do not send it a keyup.
                         subprocess.run(
