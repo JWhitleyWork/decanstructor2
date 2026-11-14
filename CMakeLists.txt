@@ -53,19 +53,34 @@ foreach(rmw_implementation ${rmw_implementations2})
   endforeach()
 endforeach()
 
-target_link_libraries(${PROJECT_NAME}_node
-  TGUI::TGUI
+rclcpp_components_register_nodes(${PROJECT_NAME}_node
+  "DeCANstructor2::DC2RosNode"
 )
 
-rclcpp_components_register_node(${PROJECT_NAME}_node
-  PLUGIN "DeCANstructor2::DC2RosNode"
-  EXECUTABLE ${PROJECT_NAME}_node_exe
-)
+ament_auto_add_library(${PROJECT_NAME}_window src/monitor_window.cpp)
+target_link_libraries(${PROJECT_NAME}_window TGUI::TGUI)
+ament_auto_add_executable(${PROJECT_NAME}_node_exe src/main.cpp)
+target_link_libraries(${PROJECT_NAME}_node_exe ${PROJECT_NAME}_node ${PROJECT_NAME}_window)
 
 if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
   ament_add_gtest(node_test test/node_test.cpp)
   target_link_libraries(node_test ${PROJECT_NAME}_node)
+  ament_add_gtest_executable(window_test test/window_test.cpp)
+  target_link_libraries(window_test ${PROJECT_NAME}_window ${PROJECT_NAME}_node)
+  find_program(XVFB_RUN xvfb-run REQUIRED)
+  set(window_result "${AMENT_TEST_RESULTS_DIR}/${PROJECT_NAME}/window_test.gtest.xml")
+  ament_add_test(window_test
+    COMMAND ${XVFB_RUN} -a $<TARGET_FILE:window_test> --gtest_output=xml:${window_result}
+    RESULT_FILE "${window_result}"
+    OUTPUT_FILE "${CMAKE_CURRENT_BINARY_DIR}/window_test.log"
+    TIMEOUT 30
+  )
+  add_executable(frame_model_test test/frame_model_test.cpp src/frame_model.cpp)
+  target_include_directories(frame_model_test PRIVATE include)
+  # The standalone model tests use assert; keep assertions active in Release builds too.
+  target_compile_options(frame_model_test PRIVATE -UNDEBUG)
+  add_test(NAME frame_model_test COMMAND frame_model_test)
   find_package(ament_lint_auto REQUIRED)
   ament_lint_auto_find_test_dependencies()
 endif()

@@ -1,5 +1,23 @@
 // Copyright 2026 Joshua Whitley
-// SPDX-License-Identifier: MIT
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in
+// all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+// THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+// THE SOFTWARE.
+
 #include <gtest/gtest.h>
 #include <chrono>
 #include <memory>
@@ -53,7 +71,7 @@ TEST_F(MonitorNodeTest, ReceivesClassicAnd64ByteFdWithoutIdentityCollisions)
   executor.add_node(monitor);
   executor.add_node(producer);
   ASSERT_TRUE(wait(executor, [&]() {
-    return classic_pub->get_subscription_count() == 1 && fd_pub->get_subscription_count() == 1;
+      return classic_pub->get_subscription_count() == 1 && fd_pub->get_subscription_count() == 1;
   }));
   can_msgs::msg::Frame classic;
   classic.id = 0x123;
@@ -64,7 +82,9 @@ TEST_F(MonitorNodeTest, ReceivesClassicAnd64ByteFdWithoutIdentityCollisions)
   fd.id = classic.id;
   fd.len = 64;
   fd.data.resize(64);
-  for (size_t i = 0; i < fd.data.size(); ++i) {fd.data[i] = i;}
+  for (size_t i = 0; i < fd.data.size(); ++i) {
+    fd.data[i] = i;
+                                                              }
   classic_pub->publish(classic);
   fd_pub->publish(fd);
   ASSERT_TRUE(wait(executor, [&]() {return monitor->model().rows().size() == 2;}));
@@ -81,12 +101,12 @@ TEST_F(MonitorNodeTest, ReceivesClassicAnd64ByteFdWithoutIdentityCollisions)
   fd.data[63] = 0xFF;
   fd_pub->publish(fd);
   ASSERT_TRUE(wait(executor, [&]() {
-    for (const auto & entry : monitor->model().rows()) {
-      if (entry.first.format == DeCANstructor2::FrameFormat::FD) {
-        return entry.second.count == 2;
+      for (const auto & entry : monitor->model().rows()) {
+        if (entry.first.format == DeCANstructor2::FrameFormat::FD) {
+          return entry.second.count == 2;
+        }
       }
-    }
-    return false;
+      return false;
   }));
   for (const auto & entry : monitor->model().rows()) {
     if (entry.first.format == DeCANstructor2::FrameFormat::FD) {
@@ -111,7 +131,7 @@ TEST_F(MonitorNodeTest, RejectsMalformedPayloadAndKeepsClassicRemoteFramesPayloa
   executor.add_node(monitor);
   executor.add_node(producer);
   ASSERT_TRUE(wait(executor, [&]() {
-    return classic_pub->get_subscription_count() == 1 && fd_pub->get_subscription_count() == 1;
+      return classic_pub->get_subscription_count() == 1 && fd_pub->get_subscription_count() == 1;
   }));
   ros2_socketcan_msgs::msg::FdFrame fd;
   fd.id = 0x123;
