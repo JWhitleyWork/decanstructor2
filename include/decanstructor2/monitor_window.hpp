@@ -42,12 +42,16 @@ public:
 private:
   sf::RenderWindow window_;
   tgui::Gui gui_;
-  tgui::ListView::Ptr frames_;
+  tgui::ScrollablePanel::Ptr frames_;
   tgui::Label::Ptr status_;
   tgui::Label::Ptr selected_;
-  std::array<tgui::Label::Ptr, 64> bytes_;
   std::map<FrameKey, size_t> row_indices_;
   std::vector<FrameKey> row_keys_;
+  std::vector<float> row_offsets_;
+  size_t selected_index_ = 0;
+  size_t visible_begin_ = 0;
+  size_t visible_end_ = 0;
+  void select_row(size_t index);
 };
 }  // namespace DeCANstructor2
 #endif  // DECANSTRUCTOR2__MONITOR_WINDOW_HPP_
