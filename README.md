@@ -29,8 +29,11 @@ colcon test
 colcon test-result --verbose
 ```
 
-The CI container additionally runs a graphical smoke test under Xvfb using
-`tools/run-tests.sh`; its image includes `xdotool` and ImageMagick.
+The CI container additionally runs an installed-app graphical smoke test under
+Xvfb using `tools/run-tests.sh`; its image includes `xdotool` and ImageMagick.
+It publishes a classic stream and two distinct 64-byte FD streams, and captures
+the default and resized windows for visual inspection. The stream-count check
+does not verify the appearance or contents of those screenshots.
 
 The manifest currently pins the small SFML 2/3 compatibility fix on the vendor
 fork because write access to the upstream vendor is not available. TGUI remains
@@ -53,9 +56,13 @@ ros2 run decanstructor2 decanstructor2_node_exe --ros-args -p classic_topic:=can
 Both subscriptions use best-effort QoS. Classic frames support up to 8 data
 bytes and CAN-FD frames up to 64. A row identifies a stream by topic,
 `header.frame_id`, CAN ID, flags and classic/FD format. It displays the receive
-count and mean interval between receptions measured with a steady clock;
-changed data bytes are highlighted yellow. The monitor holds at most 4096
-streams: once full, new streams are rejected while existing streams continue.
+count and mean interval between receptions measured with a steady clock.
+The graphite-themed table keeps classic rows compact and shows every FD payload
+in its row as an 8-by-8 byte matrix, with placeholders for unused bytes. Bytes
+changed within the last second have an amber highlight. The details panel shows
+metadata only; selecting a frame is not needed to see its payload. The monitor
+holds at most 4096 streams: once full, new streams are rejected while existing
+streams continue.
 
 ## Scope and limitations
 

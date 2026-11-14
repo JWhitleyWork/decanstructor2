@@ -43,6 +43,15 @@ def wait_until(predicate, timeout=8):
     raise AssertionError('Timed out waiting for application/window/subscriptions')
 
 
+def capture(window, screenshot, size):
+    subprocess.run(['import', '-window', window, str(screenshot)], check=True)
+    with screenshot.open('rb') as image:
+        header = image.read(24)
+    assert header[:8] == b'\x89PNG\r\n\x1a\n'
+    assert struct.unpack('>II', header[16:24]) == size, (
+        f'screenshot must contain the entire {size[0]}x{size[1]} client')
+
+
 def main():
     output = Path(sys.argv[1])
     output.mkdir(parents=True, exist_ok=True)
@@ -76,13 +85,18 @@ def main():
                     wait_until(find_window)
                     assert window is not None
                     classic = Frame(id=0x123, dlc=8, data=[0xA5, 0x5A, 1, 2, 3, 4, 5, 6])
-                    fd = FdFrame(id=0x18DAF110, is_extended=True, len=64, data=list(range(64)))
+                    fd_a = FdFrame(id=0x18DAF110, is_extended=True, len=64,
+                                   data=list(range(64)))
+                    fd_b = FdFrame(id=0x18DAF111, is_extended=True, len=64,
+                                   data=list(range(0x80, 0xC0)))
                     for i in range(30):
-                        fd.data[63] = 0xEE if i % 2 else 0xFF
+                        fd_a.data[63] = 0xEE if i % 2 else 0xFF
+                        fd_b.data[56] = 0xAA if i % 2 else 0xBB
                         classic_pub.publish(classic)
-                        fd_pub.publish(fd)
+                        fd_pub.publish(fd_a)
+                        fd_pub.publish(fd_b)
                         time.sleep(0.03)
-                    wait_until(lambda: '2 streams' in subprocess.check_output(
+                    wait_until(lambda: '3 streams' in subprocess.check_output(
                         ['xdotool', 'getwindowname', window], text=True))
                     if close_mode == 'escape':
                         # Xvfb has no window manager: SFML 3 may place the client
@@ -90,13 +104,11 @@ def main():
                         subprocess.run(['xdotool', 'windowmove', window, '0', '0'], check=True)
                         # Allow the exposed portion to be repainted before capture.
                         time.sleep(0.2)
-                        screenshot = output / 'monitor.png'
-                        subprocess.run(['import', '-window', window, str(screenshot)], check=True)
-                        with screenshot.open('rb') as image:
-                            header = image.read(24)
-                        assert header[:8] == b'\x89PNG\r\n\x1a\n'
-                        assert struct.unpack('>II', header[16:24]) == (1280, 800), (
-                            'screenshot must contain the entire 1280x800 client')
+                        capture(window, output / 'monitor.png', (1280, 800))
+                        subprocess.run(
+                            ['xdotool', 'windowsize', window, '1000', '600'], check=True)
+                        time.sleep(0.2)
+                        capture(window, output / 'monitor-resized.png', (1000, 600))
                         # Targeted XSendEvent does not change physical key state; the
                         # window may close on keydown, so do not send it a keyup.
                         subprocess.run(
@@ -105,7 +117,7 @@ def main():
                         os.killpg(process.pid, signal.SIGINT)
                     result = process.wait(timeout=5)
                     assert result == 0, f'{close_mode} shutdown returned {result}'
-                    print('PASS: installed GUI received both message types '
+                    print('PASS: installed GUI received three streams of both message types '
                           f'and exited via {close_mode}')
                 finally:
                     if process.poll() is None:
