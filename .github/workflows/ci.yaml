@@ -1,0 +1,48 @@
+name: ROS 2 CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        distro: [humble, jazzy, kilted, lyrical, rolling]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install vcstool
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-vcstool
+      - name: Import vendor dependency
+        run: |
+          mkdir -p "$RUNNER_TEMP/vendor" "$RUNNER_TEMP/dc2-workspace"
+          vcs import "$RUNNER_TEMP/vendor" < external.repos
+      - name: Build test image
+        run: docker build --build-arg ROS_DISTRO=${{ matrix.distro }} -t dc2-ci:${{ matrix.distro }} - < tools/Dockerfile
+      - name: Build and test
+        run: |
+          docker run --rm --init \
+            -e MAKEFLAGS=-j2 -e ROS_DOMAIN_ID=42 \
+            -v "$RUNNER_TEMP/dc2-workspace:/ws" \
+            -v "$GITHUB_WORKSPACE:/ws/src/decanstructor2:ro" \
+            -v "$RUNNER_TEMP/vendor/src/external/tgui_sfml_graphics_vendor:/ws/src/tgui_sfml_graphics_vendor:ro" \
+            dc2-ci:${{ matrix.distro }} bash /ws/src/decanstructor2/tools/run-tests.sh
+      - name: Upload logs, test results, and smoke artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dc2-${{ matrix.distro }}-results
+          if-no-files-found: warn
+          path: |
+            ${{ runner.temp }}/dc2-workspace/log/**
+            ${{ runner.temp }}/dc2-workspace/build/**/test_results/**
+            ${{ runner.temp }}/dc2-workspace/build/**/window_test.log
+            ${{ runner.temp }}/dc2-workspace/smoke/**
