@@ -21,7 +21,10 @@
 #include <gtest/gtest.h>
 #include <chrono>
 #include <memory>
+#include <string>
 #include <thread>
+#include <utility>
+#include <vector>
 #include <can_msgs/msg/frame.hpp>
 #include <ros2_socketcan_msgs/msg/fd_frame.hpp>
 #include "decanstructor2/decanstructor2_node.hpp"
@@ -52,6 +55,25 @@ TEST_F(MonitorNodeTest, ConstructionReturnsWithoutDisplayAndDestructionKeepsCont
   {
     auto node = std::make_shared<DeCANstructor2::DC2RosNode>(rclcpp::NodeOptions());
     EXPECT_EQ(node->get_name(), std::string("decanstructor2_ros_node"));
+  }
+  EXPECT_TRUE(rclcpp::ok());
+}
+
+TEST_F(MonitorNodeTest, EmptyTopicsDisableOnlyTheirSubscriptions)
+{
+  for (const auto & topics : {
+    std::pair<std::string, std::string>{"", "/dc2_test/enabled_fd"},
+    {"/dc2_test/enabled_classic", ""}, {"", ""}})
+  {
+    rclcpp::NodeOptions options;
+    options.parameter_overrides({{"classic_topic", topics.first}, {"fd_topic", topics.second}});
+    auto monitor = std::make_shared<DeCANstructor2::DC2RosNode>(options);
+    EXPECT_EQ(monitor->count_subscribers("/dc2_test/enabled_classic"),
+      topics.first.empty() ? 0U : 1U);
+    EXPECT_EQ(monitor->count_subscribers("/dc2_test/enabled_fd"), topics.second.empty() ? 0U : 1U);
+    EXPECT_EQ(monitor->count_subscribers("/can_in"), 0U);
+    EXPECT_EQ(monitor->count_subscribers("/can_fd_in"), 0U);
+    EXPECT_TRUE(monitor->model().rows().empty());
   }
   EXPECT_TRUE(rclcpp::ok());
 }
@@ -150,4 +172,64 @@ TEST_F(MonitorNodeTest, RejectsMalformedPayloadAndKeepsClassicRemoteFramesPayloa
   EXPECT_TRUE(frame.key.remote);
   EXPECT_EQ(frame.length, 8);
   EXPECT_TRUE(frame.data.empty());
+}
+
+TEST_F(MonitorNodeTest, RejectsInvalidClassicAndFdFramesWithoutChangingExistingData)
+{
+  auto monitor = std::make_shared<DeCANstructor2::DC2RosNode>(rclcpp::NodeOptions());
+  auto producer = std::make_shared<rclcpp::Node>("dc2_invalid_fields_producer");
+  auto classic_pub = producer->create_publisher<can_msgs::msg::Frame>("can_in", 10);
+  auto fd_pub = producer->create_publisher<ros2_socketcan_msgs::msg::FdFrame>("can_fd_in", 10);
+  rclcpp::executors::SingleThreadedExecutor executor;
+  executor.add_node(monitor);
+  executor.add_node(producer);
+  ASSERT_TRUE(wait(executor, [&]() {
+      return classic_pub->get_subscription_count() == 1 && fd_pub->get_subscription_count() == 1;
+  }));
+
+  can_msgs::msg::Frame classic;
+  classic.id = 0x123;
+  classic.dlc = 1;
+  classic.data[0] = 0xA5;
+  classic_pub->publish(classic);
+  ros2_socketcan_msgs::msg::FdFrame fd;
+  fd.id = 0x123;
+  fd.len = 1;
+  fd.data.resize(1);
+  fd.data[0] = 0x5A;
+  fd_pub->publish(fd);
+  ASSERT_TRUE(wait(executor, [&]() {return monitor->model().rows().size() == 2;}));
+
+  auto verify_unchanged = [&]() {
+      ASSERT_EQ(monitor->model().rows().size(), 2U);
+      for (const auto & entry : monitor->model().rows()) {
+        const auto & state = entry.second;
+        EXPECT_EQ(state.count, 1U);
+        EXPECT_EQ(state.frame.key.id, 0x123U);
+        const uint8_t expected = entry.first.format ==
+          DeCANstructor2::FrameFormat::FD ? 0x5A : 0xA5;
+        EXPECT_EQ(state.frame.data, (std::vector<uint8_t>{expected}));
+      }
+    };
+
+  classic.dlc = 9;
+  classic_pub->publish(classic);
+  ASSERT_TRUE(wait(executor, [&]() {return monitor->rejected_frames() == 1;}));
+  verify_unchanged();
+  classic.dlc = 1;
+  classic.id = 0x800;
+  classic_pub->publish(classic);
+  ASSERT_TRUE(wait(executor, [&]() {return monitor->rejected_frames() == 2;}));
+  verify_unchanged();
+
+  fd.id = 0x800;
+  fd_pub->publish(fd);
+  ASSERT_TRUE(wait(executor, [&]() {return monitor->rejected_frames() == 3;}));
+  verify_unchanged();
+  fd.id = 0x123;
+  fd.len = 65;
+  fd.data.resize(64);
+  fd_pub->publish(fd);
+  ASSERT_TRUE(wait(executor, [&]() {return monitor->rejected_frames() == 4;}));
+  verify_unchanged();
 }
