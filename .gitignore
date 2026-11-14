@@ -36,3 +36,6 @@
 
 # External repos
 src/external/*
+
+# Local Python environment
+.venv/

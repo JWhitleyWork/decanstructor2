@@ -8,15 +8,36 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  test:
+  quick-checks:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install pre-commit==4.2.0
+      - run: pre-commit run --all-files
+
+  test:
+    needs: quick-checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
         distro: [humble, jazzy, kilted, lyrical, rolling]
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Build test image
         run: docker build --build-arg ROS_DISTRO=${{ matrix.distro }} -t dc2-ci:${{ matrix.distro }} - < tools/Dockerfile
       - name: Import pinned vendor dependency

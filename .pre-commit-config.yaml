@@ -1,0 +1,24 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: 3e8a8703264a2f4a69428a0aa4dcb512790b2c8c  # v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-xml
+      - id: check-merge-conflict
+      - id: detect-private-key
+      - id: check-added-large-files
+  - repo: local
+    hooks:
+      - id: model-tests
+        name: ROS-free frame model tests
+        entry: tools/run-model-tests.sh
+        language: system
+        pass_filenames: false
+        files: ^(src/frame_model\.cpp|include/decanstructor2/frame_model\.hpp|test/frame_model_test\.cpp|tools/run-model-tests\.sh)$
+      - id: shell-syntax
+        name: Bash syntax
+        entry: bash -n
+        language: system
+        types: [shell]
