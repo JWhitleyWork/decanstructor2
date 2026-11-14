@@ -79,6 +79,6 @@ TEST(MonitorWindow, SelectionShowsClassicRemoteFrameWithoutInventedPayload)
   EXPECT_EQ(window.gui().get<tgui::Label>("byte0")->getText(), tgui::String("00: --"));
   EXPECT_EQ(list->getItemRow(1)[2], tgui::String("CAN"));
   EXPECT_EQ(list->getItemRow(1)[7], tgui::String("RTR (no payload)"));
-  EXPECT_NE(window.gui().get<tgui::Label>("status")->getText().find("Rejected: 1"),
-    tgui::String::npos);
+  const auto status_text = window.gui().get<tgui::Label>("status")->getText();
+  EXPECT_NE(status_text.find("Rejected: 1"), tgui::String::npos);
 }

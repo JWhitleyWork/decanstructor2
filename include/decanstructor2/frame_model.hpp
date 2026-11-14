@@ -54,7 +54,8 @@ struct MessageState
   std::optional<double> average_interval_ms;
   std::array<std::optional<int64_t>, 64> changed_at_ns{};
 };
-class FrameModel {
+class FrameModel
+{
 public:
   explicit FrameModel(std::size_t capacity = 4096)
   : capacity_(capacity) {}

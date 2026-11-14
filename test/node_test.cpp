@@ -68,8 +68,8 @@ TEST_F(MonitorNodeTest, EmptyTopicsDisableOnlyTheirSubscriptions)
     rclcpp::NodeOptions options;
     options.parameter_overrides({{"classic_topic", topics.first}, {"fd_topic", topics.second}});
     auto monitor = std::make_shared<DeCANstructor2::DC2RosNode>(options);
-    EXPECT_EQ(monitor->count_subscribers("/dc2_test/enabled_classic"),
-      topics.first.empty() ? 0U : 1U);
+    const auto classic_count = monitor->count_subscribers("/dc2_test/enabled_classic");
+    EXPECT_EQ(classic_count, topics.first.empty() ? 0U : 1U);
     EXPECT_EQ(monitor->count_subscribers("/dc2_test/enabled_fd"), topics.second.empty() ? 0U : 1U);
     EXPECT_EQ(monitor->count_subscribers("/can_in"), 0U);
     EXPECT_EQ(monitor->count_subscribers("/can_fd_in"), 0U);
@@ -81,8 +81,9 @@ TEST_F(MonitorNodeTest, EmptyTopicsDisableOnlyTheirSubscriptions)
 TEST_F(MonitorNodeTest, ReceivesClassicAnd64ByteFdWithoutIdentityCollisions)
 {
   rclcpp::NodeOptions options;
-  options.parameter_overrides({
-    {"classic_topic", "/dc2_test/classic"}, {"fd_topic", "/dc2_test/fd"}});
+  const std::vector<rclcpp::Parameter> parameters = {
+    {"classic_topic", "/dc2_test/classic"}, {"fd_topic", "/dc2_test/fd"}};
+  options.parameter_overrides(parameters);
   auto monitor = std::make_shared<DeCANstructor2::DC2RosNode>(options);
   auto producer = std::make_shared<rclcpp::Node>("dc2_test_producer");
   auto classic_pub = producer->create_publisher<can_msgs::msg::Frame>(
@@ -92,9 +93,10 @@ TEST_F(MonitorNodeTest, ReceivesClassicAnd64ByteFdWithoutIdentityCollisions)
   rclcpp::executors::SingleThreadedExecutor executor;
   executor.add_node(monitor);
   executor.add_node(producer);
-  ASSERT_TRUE(wait(executor, [&]() {
+  const auto subscribed = [&]() {
       return classic_pub->get_subscription_count() == 1 && fd_pub->get_subscription_count() == 1;
-  }));
+    };
+  ASSERT_TRUE(wait(executor, subscribed));
   can_msgs::msg::Frame classic;
   classic.id = 0x123;
   classic.dlc = 2;
@@ -106,7 +108,7 @@ TEST_F(MonitorNodeTest, ReceivesClassicAnd64ByteFdWithoutIdentityCollisions)
   fd.data.resize(64);
   for (size_t i = 0; i < fd.data.size(); ++i) {
     fd.data[i] = i;
-                                                              }
+  }
   classic_pub->publish(classic);
   fd_pub->publish(fd);
   ASSERT_TRUE(wait(executor, [&]() {return monitor->model().rows().size() == 2;}));
@@ -122,14 +124,15 @@ TEST_F(MonitorNodeTest, ReceivesClassicAnd64ByteFdWithoutIdentityCollisions)
   }
   fd.data[63] = 0xFF;
   fd_pub->publish(fd);
-  ASSERT_TRUE(wait(executor, [&]() {
+  const auto fd_received_twice = [&]() {
       for (const auto & entry : monitor->model().rows()) {
         if (entry.first.format == DeCANstructor2::FrameFormat::FD) {
           return entry.second.count == 2;
         }
       }
       return false;
-  }));
+    };
+  ASSERT_TRUE(wait(executor, fd_received_twice));
   for (const auto & entry : monitor->model().rows()) {
     if (entry.first.format == DeCANstructor2::FrameFormat::FD) {
       EXPECT_EQ(entry.second.frame.data[63], 0xFF);
@@ -152,9 +155,10 @@ TEST_F(MonitorNodeTest, RejectsMalformedPayloadAndKeepsClassicRemoteFramesPayloa
   rclcpp::executors::SingleThreadedExecutor executor;
   executor.add_node(monitor);
   executor.add_node(producer);
-  ASSERT_TRUE(wait(executor, [&]() {
+  const auto subscribed = [&]() {
       return classic_pub->get_subscription_count() == 1 && fd_pub->get_subscription_count() == 1;
-  }));
+    };
+  ASSERT_TRUE(wait(executor, subscribed));
   ros2_socketcan_msgs::msg::FdFrame fd;
   fd.id = 0x123;
   fd.len = 64;
@@ -183,9 +187,10 @@ TEST_F(MonitorNodeTest, RejectsInvalidClassicAndFdFramesWithoutChangingExistingD
   rclcpp::executors::SingleThreadedExecutor executor;
   executor.add_node(monitor);
   executor.add_node(producer);
-  ASSERT_TRUE(wait(executor, [&]() {
+  const auto subscribed = [&]() {
       return classic_pub->get_subscription_count() == 1 && fd_pub->get_subscription_count() == 1;
-  }));
+    };
+  ASSERT_TRUE(wait(executor, subscribed));
 
   can_msgs::msg::Frame classic;
   classic.id = 0x123;

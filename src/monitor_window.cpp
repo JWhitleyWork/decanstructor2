@@ -149,9 +149,10 @@ bool MonitorWindow::process_events()
 void MonitorWindow::update(const FrameModel & model, uint64_t rejected, int64_t now_ns)
 {
   window_.setTitle("DeCANstructor2 - " + std::to_string(model.rows().size()) + " streams");
-  status_->setText("Streams: " + std::to_string(model.rows().size()) +
+  const auto status = "Streams: " + std::to_string(model.rows().size()) +
     "   |   Rejected: " + std::to_string(rejected) +
-      "   |   Waiting for / receiving ROS CAN topics");
+    "   |   Waiting for / receiving ROS CAN topics";
+  status_->setText(status);
   for (const auto & entry : model.rows()) {
     auto index = row_indices_.find(entry.first);
     if (index == row_indices_.end()) {
@@ -167,20 +168,21 @@ void MonitorWindow::update(const FrameModel & model, uint64_t rejected, int64_t 
   if (index < 0 || static_cast<size_t>(index) >= row_keys_.size()) {return;}
   const auto & state = model.rows().at(row_keys_[index]);
   const auto & frame = state.frame;
-  selected_->setText(frame.key.source + "  |  ID 0x" + hex(frame.key.id,
-      frame.key.extended ? 8 : 3) +
+  const auto id_text = hex(frame.key.id, frame.key.extended ? 8 : 3);
+  const auto selected_text = frame.key.source + "  |  ID 0x" + id_text +
     "  |  " + std::to_string(frame.length) + " bytes" +
-    (frame.key.remote ? " requested (RTR, no payload)" : ""));
+    (frame.key.remote ? " requested (RTR, no payload)" : "");
+  selected_->setText(selected_text);
   for (size_t i = 0; i < bytes_.size(); ++i) {
     const bool present = i < frame.data.size();
     const auto changed_at = state.changed_at_ns[i];
     const bool changed = present && changed_at && now_ns >= *changed_at &&
       now_ns - *changed_at < 1000000000;
     bytes_[i]->setText(hex(i, 2) + ": " + (present ? hex(frame.data[i], 2) : "--"));
-    bytes_[i]->getRenderer()->setTextColor(present ? tgui::Color::Black : tgui::Color(125, 125,
-        125));
-    bytes_[i]->getRenderer()->setBackgroundColor(changed ? tgui::Color(255, 220,
-        100) : tgui::Color::White);
+    const auto text_color = present ? tgui::Color::Black : tgui::Color(125, 125, 125);
+    const auto background = changed ? tgui::Color(255, 220, 100) : tgui::Color::White;
+    bytes_[i]->getRenderer()->setTextColor(text_color);
+    bytes_[i]->getRenderer()->setBackgroundColor(background);
   }
 }
 
