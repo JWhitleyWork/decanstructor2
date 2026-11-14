@@ -28,6 +28,15 @@ namespace DeCANstructor2
 {
 namespace
 {
+sf::VideoMode monitor_video_mode()
+{
+#if SFML_VERSION_MAJOR >= 3
+  return sf::VideoMode(sf::Vector2u{1280, 800});
+#else
+  return sf::VideoMode(1280, 800);
+#endif
+}
+
 std::string hex(uint32_t value, int width)
 {
   std::ostringstream stream;
@@ -61,7 +70,7 @@ std::vector<tgui::String> row_text(const MessageState & state)
 }  // namespace
 
 MonitorWindow::MonitorWindow()
-: window_(sf::VideoMode(1280, 800), "DeCANstructor2"), gui_(window_)
+: window_(monitor_video_mode(), "DeCANstructor2"), gui_(window_)
 {
   window_.setFramerateLimit(30);
   auto title = tgui::Label::create("DeCANstructor2  |  CAN + CAN FD  |  Receive only");
@@ -115,6 +124,15 @@ MonitorWindow::MonitorWindow()
 
 bool MonitorWindow::process_events()
 {
+#if SFML_VERSION_MAJOR >= 3
+  while (const auto event = window_.pollEvent()) {
+    gui_.handleEvent(*event);
+    const auto * key = event->getIf<sf::Event::KeyPressed>();
+    if (event->is<sf::Event::Closed>() || (key && key->code == sf::Keyboard::Key::Escape)) {
+      window_.close();
+    }
+  }
+#else
   sf::Event event;
   while (window_.pollEvent(event)) {
     gui_.handleEvent(event);
@@ -124,6 +142,7 @@ bool MonitorWindow::process_events()
       window_.close();
     }
   }
+#endif
   return window_.isOpen();
 }
 

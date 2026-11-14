@@ -17,16 +17,15 @@ jobs:
         distro: [humble, jazzy, kilted, lyrical, rolling]
     steps:
       - uses: actions/checkout@v4
-      - name: Install vcstool
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y python3-vcstool
-      - name: Import vendor dependency
-        run: |
-          mkdir -p "$RUNNER_TEMP/vendor" "$RUNNER_TEMP/dc2-workspace"
-          vcs import "$RUNNER_TEMP/vendor" < external.repos
       - name: Build test image
         run: docker build --build-arg ROS_DISTRO=${{ matrix.distro }} -t dc2-ci:${{ matrix.distro }} - < tools/Dockerfile
+      - name: Import pinned vendor dependency
+        run: |
+          mkdir -p "$RUNNER_TEMP/vendor" "$RUNNER_TEMP/dc2-workspace"
+          docker run --rm --init \
+            -v "$GITHUB_WORKSPACE:/source:ro" \
+            -v "$RUNNER_TEMP/vendor:/vendor" \
+            dc2-ci:${{ matrix.distro }} bash -c 'vcs import /vendor < /source/external.repos'
       - name: Build and test
         run: |
           docker run --rm --init \

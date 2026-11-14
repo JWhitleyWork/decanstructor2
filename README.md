@@ -22,7 +22,7 @@ colcon build --cmake-args -DCMAKE_BUILD_TYPE=Debug
 source install/setup.bash
 ```
 
-For tests, install `xvfb` and `xauth` as well. Then run:
+For tests, install `xvfb` and `xauth` before building (tests are enabled by default). Then run:
 
 ```bash
 colcon test
@@ -31,6 +31,10 @@ colcon test-result --verbose
 
 The CI container additionally runs a graphical smoke test under Xvfb using
 `tools/run-tests.sh`; its image includes `xdotool` and ImageMagick.
+
+The manifest currently pins the small SFML 2/3 compatibility fix on the vendor
+fork because write access to the upstream vendor is not available. TGUI remains
+at v1.10.0.
 
 ## Run
 

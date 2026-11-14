@@ -1,5 +1,5 @@
 repositories:
   src/external/tgui_sfml_graphics_vendor:
     type: git
-    url: https://github.com/JWhitleyWork/tgui_sfml_graphics_vendor.git
-    version: main
+    url: https://github.com/maximus5684/tgui_sfml_graphics_vendor.git
+    version: e14bbbdf64f6df561a4124a6fd3e68fd5ba49dfd

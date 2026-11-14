@@ -5,7 +5,7 @@ ARG ROS_DISTRO
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential cmake git libsfml-dev xvfb xauth xdotool imagemagick \
-    python3-colcon-common-extensions python3-pytest \
+    python3-colcon-common-extensions python3-pytest python3-vcstool \
     ros-${ROS_DISTRO}-ament-cmake-auto \
     ros-${ROS_DISTRO}-ament-cmake-vendor-package \
     ros-${ROS_DISTRO}-ament-cmake-gtest \
