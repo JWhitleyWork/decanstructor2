@@ -238,3 +238,40 @@ TEST_F(MonitorNodeTest, RejectsInvalidClassicAndFdFramesWithoutChangingExistingD
   ASSERT_TRUE(wait(executor, [&]() {return monitor->rejected_frames() == 4;}));
   verify_unchanged();
 }
+
+TEST_F(MonitorNodeTest, RemappedNamespacedEmptyFdUsesResolvedTopicAndFrameId)
+{
+  rclcpp::NodeOptions options;
+  options.arguments({"--ros-args", "-r", "__ns:=/dc2_ns", "-r", "can_fd_in:=received_fd"});
+  options.parameter_overrides({{"classic_topic", ""}});
+  auto monitor = std::make_shared<DeCANstructor2::DC2RosNode>(options);
+  auto producer = std::make_shared<rclcpp::Node>("dc2_namespaced_producer");
+  auto publisher = producer->create_publisher<ros2_socketcan_msgs::msg::FdFrame>(
+    "/dc2_ns/received_fd", 10);
+  rclcpp::executors::SingleThreadedExecutor executor;
+  executor.add_node(monitor);
+  executor.add_node(producer);
+  ASSERT_TRUE(wait(executor, [&]() {return publisher->get_subscription_count() == 1;}));
+  ros2_socketcan_msgs::msg::FdFrame frame;
+  frame.id = 0x123;
+  publisher->publish(frame);
+  ASSERT_TRUE(wait(executor, [&]() {return monitor->model().rows().size() == 1;}));
+  const auto & first = monitor->model().rows().begin()->second;
+  EXPECT_EQ(first.frame.key.source, "/dc2_ns/received_fd");
+  EXPECT_EQ(first.frame.key.format, DeCANstructor2::FrameFormat::FD);
+  EXPECT_EQ(first.frame.length, 0);
+  EXPECT_TRUE(first.frame.data.empty());
+  frame.header.frame_id = "bus_a";
+  publisher->publish(frame);
+  ASSERT_TRUE(wait(executor, [&]() {return monitor->model().rows().size() == 2;}));
+  bool found = false;
+  for (const auto & entry : monitor->model().rows()) {
+    if (entry.first.source == "/dc2_ns/received_fd [bus_a]") {
+      found = true;
+      EXPECT_EQ(entry.second.count, 1U);
+      EXPECT_TRUE(entry.second.frame.data.empty());
+    }
+  }
+  EXPECT_TRUE(found);
+  EXPECT_EQ(monitor->rejected_frames(), 0U);
+}

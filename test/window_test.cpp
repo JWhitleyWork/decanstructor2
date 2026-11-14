@@ -233,3 +233,67 @@ TEST(MonitorWindow, ScrollsLargeModelWithBoundedVisibleWidgets)
   EXPECT_EQ(last->get<tgui::Label>("byte63")->getText(), tgui::String("CD"));
   EXPECT_LT(table->getWidgets().size(), 10U);
 }
+
+TEST(MonitorWindow, LateEarlierKeyKeepsRowsAndSelectionStable)
+{
+  DeCANstructor2::FrameModel model;
+  DeCANstructor2::MonitorWindow window;
+  DeCANstructor2::Frame frame;
+  frame.key.source = "/z";
+  frame.length = 1;
+  frame.data = {0xAB};
+  ASSERT_TRUE(model.ingest(frame, 10));
+  window.update(model, 0, 10);
+  auto table = window.gui().get<tgui::ScrollablePanel>("frames");
+  auto row = table->get<tgui::Panel>("row0");
+  ASSERT_TRUE(row);
+  window.gui().getContainer()->leftMousePressed(
+    row->getAbsolutePosition() + tgui::Vector2f{5, 5});
+  window.update(model, 0, 10);
+  EXPECT_NE(window.gui().get<tgui::Label>("selected")->getText().find("/z"), tgui::String::npos);
+  frame.key.source = "/a";
+  frame.data[0] = 0xCD;
+  ASSERT_TRUE(model.ingest(frame, 20));
+  window.update(model, 0, 20);
+  row = table->get<tgui::Panel>("row0");
+  auto late = table->get<tgui::Panel>("row1");
+  ASSERT_TRUE(row);
+  ASSERT_TRUE(late);
+  EXPECT_EQ(row->get<tgui::Label>("byte0")->getText(), tgui::String("AB"));
+  EXPECT_EQ(late->get<tgui::Label>("byte0")->getText(), tgui::String("CD"));
+  EXPECT_NE(window.gui().get<tgui::Label>("selected")->getText().find("/z"), tgui::String::npos);
+}
+
+TEST(MonitorWindow, ShrinkingFdClearsUnusedCellsAndHighlights)
+{
+  DeCANstructor2::FrameModel model;
+  DeCANstructor2::MonitorWindow window;
+  DeCANstructor2::Frame frame;
+  frame.key.format = DeCANstructor2::FrameFormat::FD;
+  frame.length = 64;
+  frame.data.resize(64, 0xAA);
+  ASSERT_TRUE(model.ingest(frame, 10));
+  frame.data[63] = 0xBB;
+  ASSERT_TRUE(model.ingest(frame, 20));
+  window.update(model, 0, 20);
+  auto table = window.gui().get<tgui::ScrollablePanel>("frames");
+  auto row = table->get<tgui::Panel>("row0");
+  ASSERT_TRUE(row);
+  auto last = row->get<tgui::Label>("byte63");
+  auto first = row->get<tgui::Label>("byte0");
+  ASSERT_TRUE(last);
+  ASSERT_TRUE(first);
+  EXPECT_NE(background(last), background(first));
+  frame.length = 1;
+  frame.data.resize(1);
+  ASSERT_TRUE(model.ingest(frame, 30));
+  window.update(model, 0, 30);
+  EXPECT_EQ(last->getText(), tgui::String("--"));
+  EXPECT_EQ(background(last), background(first));
+  frame.length = 64;
+  frame.data.resize(64, 0xCC);
+  ASSERT_TRUE(model.ingest(frame, 40));
+  window.update(model, 0, 40);
+  EXPECT_EQ(last->getText(), tgui::String("CC"));
+  EXPECT_NE(background(last), background(first));
+}

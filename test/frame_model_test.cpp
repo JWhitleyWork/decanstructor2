@@ -163,8 +163,56 @@ void capacity_bound()
   assert(model.rows().at(frame.key).count == 2);
 }
 
+void zero_capacity_and_invalid_format()
+{
+  FrameModel empty(0);
+  auto frame = make_frame();
+  assert(!empty.ingest(frame, 1));
+  assert(empty.rows().empty());
+  FrameModel model;
+  assert(model.ingest(frame, 1));
+  auto invalid = frame;
+  invalid.key.format = static_cast<FrameFormat>(99);
+  assert(!model.ingest(invalid, 2));
+  assert(model.rows().size() == 1);
+  assert(model.rows().at(frame.key).count == 1);
+  assert(model.ingest(frame, 1000001));
+  assert(model.rows().at(frame.key).average_interval_ms == 1.0);
+}
+
+void independent_stream_timing()
+{
+  FrameModel model;
+  auto a = make_frame();
+  auto b = a; b.key.source = "can1";
+  assert(model.ingest(a, 1000000));
+  assert(model.ingest(b, 10000000));
+  assert(model.ingest(a, 3000000));
+  assert(model.ingest(b, 15000000));
+  assert(model.rows().at(a.key).average_interval_ms == 2.0);
+  assert(model.rows().at(b.key).average_interval_ms == 5.0);
+  assert(model.ingest(a, 2000000));
+  assert(!model.rows().at(a.key).average_interval_ms);
+  assert(model.rows().at(b.key).average_interval_ms == 5.0);
+  assert(model.ingest(b, 21000000));
+  assert(model.rows().at(b.key).average_interval_ms == 5.5);
+}
+
+void payload_is_copied()
+{
+  FrameModel model;
+  auto frame = make_frame();
+  assert(model.ingest(frame, 1));
+  frame.data[0] = 9;
+  frame.data.push_back(8);
+  assert(model.rows().at(frame.key).frame.data == (std::vector<uint8_t>{1, 1}));
+}
+
 int main()
 {
+  zero_capacity_and_invalid_format();
+  independent_stream_timing();
+  payload_is_copied();
   capacity_bound();
   basic_and_timing();
   changes();
