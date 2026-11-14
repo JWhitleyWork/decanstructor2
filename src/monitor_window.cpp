@@ -154,16 +154,18 @@ void MonitorWindow::select_row(size_t index)
 void MonitorWindow::update(const FrameModel & model, uint64_t rejected, int64_t now_ns)
 {
   window_.setTitle("DeCANstructor2 - " + std::to_string(model.rows().size()) + " streams");
-  status_->setText("Streams: " + std::to_string(model.rows().size()) +
+  const auto status_text = "Streams: " + std::to_string(model.rows().size()) +
     "    |    Rejected: " + std::to_string(rejected) +
-    "    |    Receipt interval (steady clock)    |    Amber: changed within 1s");
+    "    |    Receipt interval (steady clock)    |    Amber: changed within 1s";
+  status_->setText(status_text);
   for (const auto & entry : model.rows()) {
     if (row_indices_.find(entry.first) == row_indices_.end()) {
       row_indices_.emplace(entry.first, row_keys_.size());
       row_keys_.push_back(entry.first);
-      row_offsets_.push_back(row_offsets_.empty() ? 0 :
+      const float offset = row_offsets_.empty() ? 0 :
         row_offsets_.back() + (row_keys_[row_keys_.size() - 2].format == FrameFormat::FD ?
-        fd_height : classic_height));
+        fd_height : classic_height);
+      row_offsets_.push_back(offset);
     }
   }
   const float total = row_keys_.empty() ? 0 : row_offsets_.back() +
@@ -208,8 +210,9 @@ void MonitorWindow::update(const FrameModel & model, uint64_t rejected, int64_t 
       const size_t bytes = fd ? 64 : 8;
       for (size_t i = 0; i < bytes; ++i) {
         auto byte = label("", 14);
-        byte->setPosition(tgui::Layout{tgui::String{std::to_string(45 + (i % 8) * 4.4) + "%"}},
-          static_cast<float>(fd ? 4 + (i / 8) * 23 : 5));
+        const auto x = tgui::Layout{tgui::String{std::to_string(45 + (i % 8) * 4.4) + "%"}};
+        const auto y = static_cast<float>(fd ? 4 + (i / 8) * 23 : 5);
+        byte->setPosition(x, y);
         byte->setSize("4%", 20);
         byte->setHorizontalAlignment(tgui::HorizontalAlignment::Center);
         row->add(byte, "byte" + std::to_string(i));
@@ -221,8 +224,9 @@ void MonitorWindow::update(const FrameModel & model, uint64_t rejected, int64_t 
     const auto & frame = state.frame;
     auto row = frames_->get<tgui::Panel>("row" + std::to_string(index));
     row->setSize(content_width, frame.key.format == FrameFormat::FD ? fd_height : classic_height);
-    row->getRenderer()->setBackgroundColor(index == selected_index_ ?
-      tgui::Color(41, 56, 67) : tgui::Color(33, 36, 38));
+    const auto row_background = index == selected_index_ ?
+      tgui::Color(41, 56, 67) : tgui::Color(33, 36, 38);
+    row->getRenderer()->setBackgroundColor(row_background);
     row->get<tgui::Label>("source")->setText(frame.key.source);
     row->get<tgui::Label>("id")->setText(
       "0x" + hex(frame.key.id, frame.key.extended || frame.key.error ? 8 : 3));
@@ -252,10 +256,12 @@ void MonitorWindow::update(const FrameModel & model, uint64_t rejected, int64_t 
   if (!row_keys_.empty()) {
     const auto & state = model.rows().at(row_keys_[selected_index_]);
     const auto & frame = state.frame;
-    selected_->setText("ID\n0x" + hex(frame.key.id, frame.key.extended || frame.key.error ? 8 : 3) +
+    const auto id_text = hex(frame.key.id, frame.key.extended || frame.key.error ? 8 : 3);
+    const auto metadata = "ID\n0x" + id_text +
       "\n\nTOPIC\n" + frame.key.source + "\n\nFORMAT\n" +
       (frame.key.format == FrameFormat::FD ? "CAN FD" : "Classic CAN") + "\n\nFLAGS\n" +
-      flags(frame.key) + "\n\nBRS / ESI\nUnavailable");
+      flags(frame.key) + "\n\nBRS / ESI\nUnavailable";
+    selected_->setText(metadata);
   }
 }
 

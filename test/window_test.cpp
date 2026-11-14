@@ -20,6 +20,14 @@
 #include <gtest/gtest.h>
 #include "decanstructor2/monitor_window.hpp"
 
+namespace
+{
+tgui::Color background(const tgui::Label::Ptr & byte)
+{
+  return byte->getRenderer()->getBackgroundColor();
+}
+}  // namespace
+
 TEST(MonitorWindow, UnselectedFdRowsExposeAllBytesAndExpireHighlights)
 {
   using DeCANstructor2::Frame;
@@ -61,8 +69,8 @@ TEST(MonitorWindow, UnselectedFdRowsExposeAllBytesAndExpireHighlights)
   window.gui().getContainer()->leftMousePressed(
     third_last->getAbsolutePosition() + tgui::Vector2f{4, 4});
   window.update(model, 0, 100);
-  EXPECT_NE(window.gui().get<tgui::Label>("selected")->getText().find("/fd3"),
-    tgui::String::npos);
+  const auto selected_text = window.gui().get<tgui::Label>("selected")->getText();
+  EXPECT_NE(selected_text.find("/fd3"), tgui::String::npos);
   frame.data[63] = 0xEF;
   ASSERT_TRUE(model.ingest(frame, 200));
   frame.key.source = "/fd2";
@@ -71,13 +79,10 @@ TEST(MonitorWindow, UnselectedFdRowsExposeAllBytesAndExpireHighlights)
   window.update(model, 0, 200);
   EXPECT_EQ(last->getText(), tgui::String("F0"));
   EXPECT_EQ(third_last->getText(), tgui::String("EF"));
-  EXPECT_NE(third_last->getRenderer()->getBackgroundColor(),
-    first_last->getRenderer()->getBackgroundColor());
-  EXPECT_NE(last->getRenderer()->getBackgroundColor(),
-    first_last->getRenderer()->getBackgroundColor());
+  EXPECT_NE(background(third_last), background(first_last));
+  EXPECT_NE(background(last), background(first_last));
   window.update(model, 0, 1000000200);
-  EXPECT_EQ(last->getRenderer()->getBackgroundColor(),
-    first_last->getRenderer()->getBackgroundColor());
+  EXPECT_EQ(background(last), background(first_last));
   window.draw();
 }
 
@@ -113,8 +118,8 @@ TEST(MonitorWindow, ShortFdAndClassicRemoteHaveNoInventedPayload)
   EXPECT_EQ(remote_row->get<tgui::Label>("byte0")->getText(), tgui::String("--"));
   const auto metadata = window.gui().get<tgui::Label>("selected")->getText();
   EXPECT_EQ(metadata.find("AB"), tgui::String::npos);
-  EXPECT_NE(window.gui().get<tgui::Label>("status")->getText().find("Rejected: 1"),
-    tgui::String::npos);
+  const auto status = window.gui().get<tgui::Label>("status")->getText();
+  EXPECT_NE(status.find("Rejected: 1"), tgui::String::npos);
   window.gui().getContainer()->leftMousePressed(
     remote_row->getAbsolutePosition() + tgui::Vector2f{5, 5});
   window.update(model, 1, 100);
@@ -145,13 +150,13 @@ TEST(MonitorWindow, ClassicChangesAndEmptyFdAreRepresentedInRow)
   ASSERT_TRUE(row);
   ASSERT_TRUE(fd);
   EXPECT_EQ(row->get<tgui::Label>("byte1")->getText(), tgui::String("56"));
-  EXPECT_NE(row->get<tgui::Label>("byte1")->getRenderer()->getBackgroundColor(),
-    row->get<tgui::Label>("byte0")->getRenderer()->getBackgroundColor());
+  const auto changed = row->get<tgui::Label>("byte1");
+  const auto unchanged = row->get<tgui::Label>("byte0");
+  EXPECT_NE(background(changed), background(unchanged));
   EXPECT_EQ(fd->get<tgui::Label>("byte0")->getText(), tgui::String("--"));
   EXPECT_EQ(fd->get<tgui::Label>("byte63")->getText(), tgui::String("--"));
   window.update(model, 0, 1000000020);
-  EXPECT_EQ(row->get<tgui::Label>("byte1")->getRenderer()->getBackgroundColor(),
-    row->get<tgui::Label>("byte0")->getRenderer()->getBackgroundColor());
+  EXPECT_EQ(background(changed), background(unchanged));
 }
 
 TEST(MonitorWindow, HeadersTrackColumnsAndNarrowWindowsPreserveCellWidths)
@@ -171,8 +176,8 @@ TEST(MonitorWindow, HeadersTrackColumnsAndNarrowWindowsPreserveCellWidths)
   ASSERT_TRUE(header);
   auto row = table->get<tgui::Panel>("row0");
   ASSERT_TRUE(row);
-  EXPECT_FLOAT_EQ(header->get<tgui::Label>("id")->getPosition().x,
-    row->get<tgui::Label>("id")->getPosition().x);
+  const auto header_x = header->get<tgui::Label>("id")->getPosition().x;
+  EXPECT_FLOAT_EQ(header_x, row->get<tgui::Label>("id")->getPosition().x);
   window.gui().setAbsoluteView({0, 0, 1000, 600});
   window.update(model, 0, 100);
   EXPECT_GE(row->getSize().x, 980.f);
