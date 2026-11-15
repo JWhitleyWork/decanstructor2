@@ -83,20 +83,25 @@ MonitorWindow::MonitorWindow()
   selector_->setPosition(220, 48);
   selector_->setSize(500, 450);
   selector_->setVisible(false);
+  selector_->getRenderer()->setBackgroundColor(tgui::Color(33, 36, 38));
+  selector_->getRenderer()->setTitleBarColor(tgui::Color(43, 47, 50));
+  selector_->getRenderer()->setTitleColor(text);
+  selector_->getRenderer()->setBorderColor(tgui::Color(73, 82, 89));
   selector_->onClose([this] {selector_->setVisible(false);});
   auto show = tgui::Button::create("Show all");
   show->setPosition(8, 8);
   show->setSize(100, 30);
-  show->onPress([this] {bulk_ = 1; projection_dirty_ = true;});
+  show->onPress([this] {set_known_visible(true);});
   selector_->add(show, "show_all");
   auto hide = tgui::Button::create("Hide all");
   hide->setPosition(116, 8);
   hide->setSize(100, 30);
-  hide->onPress([this] {bulk_ = -1; projection_dirty_ = true;});
+  hide->onPress([this] {set_known_visible(false);});
   selector_->add(hide, "hide_all");
   choices_ = tgui::ScrollablePanel::create();
   choices_->setPosition(8, 46);
   choices_->setSize("100% - 16", "100% - 54");
+  choices_->getRenderer()->setBackgroundColor(tgui::Color(29, 32, 34));
   selector_->add(choices_, "stream_choices");
 
   auto columns = tgui::Panel::create();
@@ -113,7 +118,8 @@ MonitorWindow::MonitorWindow()
       sort_->setPosition(field_positions[n], 0);
       sort_->setSize(field_widths[n], 29);
       sort_->setTextSize(12);
-      sort_->onPress([this] {
+      sort_->onPress(
+        [this] {
           view_.toggle_sort();
           projection_dirty_ = true;
           frames_->getVerticalScrollbar()->setValue(0);
@@ -194,14 +200,18 @@ void MonitorWindow::select_row(const FrameKey & key)
   selected_key_ = key;
 }
 
+void MonitorWindow::set_known_visible(bool visible)
+{
+  for (const auto & key : choice_keys_) {
+    view_.set_visible(key, visible);
+  }
+  projection_dirty_ = true;
+  frames_->getVerticalScrollbar()->setValue(0);
+}
+
 void MonitorWindow::update(const FrameModel & model, uint64_t rejected, int64_t now_ns)
 {
   window_.setTitle("DeCANstructor2 - " + std::to_string(model.rows().size()) + " streams");
-  if (bulk_) {
-    view_.set_all_visible(model, bulk_ > 0);
-    bulk_ = 0;
-    frames_->getVerticalScrollbar()->setValue(0);
-  }
   const bool rebuild = projection_dirty_ || known_count_ != model.rows().size();
   if (rebuild) {
     row_keys_ = view_.visible_keys(model);
@@ -230,12 +240,15 @@ void MonitorWindow::update(const FrameModel & model, uint64_t rejected, int64_t 
   status_->setText(status_text);
   empty_->setVisible(row_keys_.empty() && !model.rows().empty());
   constexpr float choice_height = 32;
-  choices_->setContentSize({std::max(1.f, choices_->getSize().x - 20),
+  choices_->setContentSize(
+    {std::max(1.f, choices_->getSize().x - 20),
       std::max(1.f, choice_height * choice_keys_.size())});
   const auto choice_scroll = choices_->getVerticalScrollbar()->getValue();
-  const size_t cb = std::min(choice_keys_.size(),
-      static_cast<size_t>(choice_scroll / choice_height));
-  const size_t ce = std::min(choice_keys_.size(), cb +
+  const size_t cb = std::min(
+    choice_keys_.size(),
+    static_cast<size_t>(choice_scroll / choice_height));
+  const size_t ce = std::min(
+    choice_keys_.size(), cb +
     static_cast<size_t>(choices_->getSize().y / choice_height) + 2);
   if (rebuild || cb != choice_begin_ || ce != choice_end_) {
     choices_->removeAllWidgets();
@@ -251,8 +264,13 @@ void MonitorWindow::update(const FrameModel & model, uint64_t rejected, int64_t 
       choice->setSize(22, 22);
       choice->setTextSize(14);
       choice->setChecked(view_.is_visible(key));
-      choice->setToolTip(label(caption));
-      choice->onChange([this, key](bool checked) {
+      choice->getRenderer()->setTextColor(text);
+      choice->getRenderer()->setTextColorHover(text);
+      auto tooltip = label(caption);
+      tooltip->getRenderer()->setBackgroundColor(cell);
+      choice->setToolTip(tooltip);
+      choice->onChange(
+        [this, key](bool checked) {
           view_.set_visible(key, checked);
           projection_dirty_ = true;
           frames_->getVerticalScrollbar()->setValue(0);

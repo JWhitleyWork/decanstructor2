@@ -59,12 +59,13 @@ private:
   bool initial_selection_done_ = false;
   bool projection_dirty_ = true;
   size_t known_count_ = 0;
-  int bulk_ = 0;
+
   size_t choice_begin_ = 0;
   size_t choice_end_ = 0;
   size_t visible_begin_ = 0;
   size_t visible_end_ = 0;
   void select_row(const FrameKey & key);
+  void set_known_visible(bool visible);
 };
 }  // namespace DeCANstructor2
 #endif  // DECANSTRUCTOR2__MONITOR_WINDOW_HPP_

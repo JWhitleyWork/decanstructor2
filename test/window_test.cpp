@@ -336,10 +336,12 @@ TEST(MonitorWindow, StreamControlsHideAndRestoreWhileReceptionContinues)
   ASSERT_TRUE(selector);
   click(selector->get<tgui::Button>("hide_all"));
   EXPECT_EQ(window.gui().get<tgui::ScrollablePanel>("frames")->getWidgets().size(), 0U);
-  EXPECT_EQ(window.gui().get<tgui::Label>("selected")->getText().find("/first"),
+  EXPECT_EQ(
+    window.gui().get<tgui::Label>("selected")->getText().find("/first"),
     tgui::String::npos);
   EXPECT_TRUE(window.gui().get<tgui::Label>("empty_hint")->isVisible());
-  EXPECT_NE(window.gui().get<tgui::Label>("empty_hint")->getText().find("reception continues"),
+  EXPECT_NE(
+    window.gui().get<tgui::Label>("empty_hint")->getText().find("reception continues"),
     tgui::String::npos);
   EXPECT_NE(window.gui().get<tgui::Label>("status")->getText().find("0/1"), tgui::String::npos);
   frame.data[0] = 0x34;
@@ -395,6 +397,53 @@ TEST(MonitorWindow, CheckboxUsesFullKeyAndDoesNotReselectAfterRestore)
   click(checkbox);
   EXPECT_EQ(window.gui().get<tgui::Label>("selected")->getText(), "Select a frame");
   ASSERT_TRUE(table->get<tgui::Panel>("row1"));
+}
+
+TEST(MonitorWindow, BulkActionsAffectOnlyKeysKnownAtClick)
+{
+  DeCANstructor2::FrameModel model;
+  DeCANstructor2::MonitorWindow window;
+  DeCANstructor2::Frame known;
+  known.key.source = "/known";
+  ASSERT_TRUE(model.ingest(known, 10));
+  window.update(model, 0, 10);
+  auto click = [&](const tgui::Widget::Ptr & widget) {
+      ASSERT_TRUE(widget);
+      const auto point = widget->getAbsolutePosition() + tgui::Vector2f{5, 5};
+      window.gui().getContainer()->leftMousePressed(point);
+      window.gui().getContainer()->leftMouseReleased(point);
+    };
+  click(window.gui().get<tgui::Button>("streams_toggle"));
+  auto selector = window.gui().get<tgui::ChildWindow>("stream_selector");
+  click(selector->get<tgui::Button>("hide_all"));
+  // A callback is followed by ROS executor work before the next GUI update.
+  DeCANstructor2::Frame late;
+  late.key.source = "/late";
+  ASSERT_TRUE(model.ingest(late, 20));
+  window.update(model, 0, 20);
+  auto table = window.gui().get<tgui::ScrollablePanel>("frames");
+  auto row = table->get<tgui::Panel>("row0");
+  ASSERT_TRUE(row);
+  EXPECT_EQ(row->get<tgui::Label>("source")->getText(), "/late");
+  EXPECT_EQ(table->getWidgets().size(), 1U);
+  EXPECT_NE(window.gui().get<tgui::Label>("status")->getText().find("1/2"), tgui::String::npos);
+  EXPECT_EQ(window.gui().get<tgui::Label>("selected")->getText(), "Select a frame");
+}
+
+TEST(MonitorWindow, SelectorUsesGraphiteColors)
+{
+  DeCANstructor2::FrameModel model;
+  DeCANstructor2::MonitorWindow window;
+  DeCANstructor2::Frame frame;
+  ASSERT_TRUE(model.ingest(frame, 10));
+  window.update(model, 0, 10);
+  auto selector = window.gui().get<tgui::ChildWindow>("stream_selector");
+  auto choices = selector->get<tgui::ScrollablePanel>("stream_choices");
+  EXPECT_EQ(selector->getRenderer()->getBackgroundColor(), tgui::Color(33, 36, 38));
+  EXPECT_EQ(choices->getRenderer()->getBackgroundColor(), tgui::Color(29, 32, 34));
+  auto choice = choices->get<tgui::CheckBox>("choice0");
+  ASSERT_TRUE(choice);
+  EXPECT_EQ(choice->getRenderer()->getTextColor(), tgui::Color(229, 231, 230));
 }
 
 TEST(MonitorWindow, VirtualizedChoicesReachLastStreamAndMixedRowsScroll)

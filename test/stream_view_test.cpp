@@ -23,7 +23,12 @@
 #include <iostream>
 #include <vector>
 
-using namespace DeCANstructor2;
+using DeCANstructor2::Frame;
+using DeCANstructor2::FrameFormat;
+using DeCANstructor2::FrameKey;
+using DeCANstructor2::FrameModel;
+using DeCANstructor2::IdSortDirection;
+using DeCANstructor2::StreamView;
 
 Frame frame(const char * source, uint32_t id)
 {
@@ -47,7 +52,9 @@ void ordering()
   assert(view.is_visible(low.key));
   assert(view.ordered_keys(model).empty());
   assert(view.visible_keys(model).empty());
-  for (const auto & f : {low, mid, tie, high}) {assert(model.ingest(f, 1));}
+  for (const auto & f : {low, mid, tie, high}) {
+    assert(model.ingest(f, 1));
+  }
   assert(view.ordered_keys(model) == (std::vector<FrameKey>{low.key, tie.key, mid.key, high.key}));
   view.toggle_sort();
   assert(view.sort_direction() == IdSortDirection::Descending);
@@ -71,12 +78,16 @@ void visibility_identity_and_bulk()
   auto remote = base; remote.key.remote = true; remote.data.clear();
   auto fd = base; fd.key.format = FrameFormat::FD;
   std::vector<Frame> frames{base, source, extended, error, remote, fd};
-  for (const auto & f : frames) {assert(model.ingest(f, 1));}
+  for (const auto & f : frames) {
+    assert(model.ingest(f, 1));
+  }
   assert(model.rows().size() == frames.size());
   for (const auto & hidden : frames) {
     view.set_visible(hidden.key, false);
     view.set_visible(hidden.key, false);
-    for (const auto & f : frames) {assert(view.is_visible(f.key) == !(f.key == hidden.key));}
+    for (const auto & f : frames) {
+      assert(view.is_visible(f.key) == !(f.key == hidden.key));
+    }
     view.set_visible(hidden.key, true);
     view.set_visible(hidden.key, true);
     assert(view.is_visible(hidden.key));

@@ -53,16 +53,20 @@ public:
     std::vector<FrameKey> keys;
     keys.reserve(model.rows().size());
     for (const auto & row : model.rows()) {keys.push_back(row.first);}
-    std::sort(keys.begin(), keys.end(), [this](const FrameKey & a, const FrameKey & b) {
+    std::sort(
+      keys.begin(), keys.end(), [this](const FrameKey & a, const FrameKey & b) {
         if (a.id == b.id) {return a < b;}
-        return direction_ == IdSortDirection::Ascending ? a.id < b.id : a.id > b.id;
+        if (direction_ == IdSortDirection::Ascending) {return a.id < b.id;}
+        return a.id > b.id;
       });
     return keys;
   }
   std::vector<FrameKey> visible_keys(const FrameModel & model) const
   {
     auto keys = ordered_keys(model);
-    keys.erase(std::remove_if(keys.begin(), keys.end(), [this](const FrameKey & key) {
+    keys.erase(
+      std::remove_if(
+        keys.begin(), keys.end(), [this](const FrameKey & key) {
           return !is_visible(key);
         }), keys.end());
     return keys;
