@@ -87,7 +87,7 @@ MonitorWindow::MonitorWindow()
   selector_->getRenderer()->setTitleBarColor(tgui::Color(43, 47, 50));
   selector_->getRenderer()->setTitleColor(text);
   selector_->getRenderer()->setBorderColor(tgui::Color(73, 82, 89));
-  selector_->onClose([this] {selector_->setVisible(false);});
+  selector_->setCloseBehavior(tgui::ChildWindow::CloseBehavior::Hide);
   auto show = tgui::Button::create("Show all");
   show->setPosition(8, 8);
   show->setSize(100, 30);

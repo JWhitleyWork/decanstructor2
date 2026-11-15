@@ -24,6 +24,30 @@ measured with a steady clock and is not a bus timestamp. Scroll through longer
 stream lists without collapsing FD payloads. Press **Escape**, close the window,
 or use **Ctrl+C** in the launching terminal to exit.
 
+### Stream visibility and ID sorting
+
+Open **Streams...** for a scrollable checklist of known streams. Uncheck an entry
+to hide it, or use **Show all / Hide all** for the streams currently known.
+Hidden streams keep receiving: showing one again reveals its latest payload,
+count and timing, without restarting the byte-change highlight timer. A newly
+discovered stream starts visible, even after **Hide all**. Visibility choices
+last for the current application session only.
+
+Each checklist entry identifies the source, CAN ID, classic/FD format and flags;
+hover for its complete label. Streams sharing an ID remain independently
+selectable when their source, flags or format differ. The status bar reports
+visible/total streams, and an all-hidden view explains how to show them again.
+
+The table starts in ascending **numeric CAN ID** order. Click the **ID ^ / ID v**
+header to reverse the ID direction; equal-ID streams keep a deterministic order
+by source and remaining identity fields. Sorting or hiding another stream keeps
+the selected stream's metadata. Hiding the selected stream clears the selection;
+showing it again does not select it automatically. Explicit sort/visibility
+changes scroll the table to the top.
+
+These controls affect the display only: subscriptions and the 4096-stream limit
+are unchanged, and every visible FD row retains its complete inline matrix.
+
 ## Build
 
 Install ROS 2 for your distro, `git`, `python3-vcstool`, `python3-rosdep`,
@@ -89,7 +113,7 @@ streams continue.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md#quick-checks) to install the pre-commit
 hook and run fast checks without ROS or Docker. These include repository hygiene,
-YAML/XML and Bash syntax checks, and standalone frame-model unit tests. CI runs
+YAML/XML and Bash syntax checks, and standalone frame-model/stream-view unit tests. CI runs
 the same quick checks before the five-distribution ROS build, test and GUI smoke
 matrix; the quick checks do not replace that integration coverage.
 

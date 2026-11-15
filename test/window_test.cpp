@@ -430,6 +430,27 @@ TEST(MonitorWindow, BulkActionsAffectOnlyKeysKnownAtClick)
   EXPECT_EQ(window.gui().get<tgui::Label>("selected")->getText(), "Select a frame");
 }
 
+TEST(MonitorWindow, ClosedStreamSelectorCanBeReopened)
+{
+  DeCANstructor2::FrameModel model;
+  DeCANstructor2::MonitorWindow window;
+  window.update(model, 0, 10);
+  auto toggle = window.gui().get<tgui::Button>("streams_toggle");
+  const auto point = toggle->getAbsolutePosition() + tgui::Vector2f{5, 5};
+  window.gui().getContainer()->leftMousePressed(point);
+  window.gui().getContainer()->leftMouseReleased(point);
+  auto selector = window.gui().get<tgui::ChildWindow>("stream_selector");
+  ASSERT_TRUE(selector);
+  ASSERT_TRUE(selector->isVisible());
+  selector->close();  // The public operation invoked by the title-bar X button.
+  ASSERT_EQ(window.gui().get<tgui::ChildWindow>("stream_selector"), selector);
+  EXPECT_FALSE(selector->isVisible());
+  window.gui().getContainer()->leftMousePressed(point);
+  window.gui().getContainer()->leftMouseReleased(point);
+  window.update(model, 0, 10);
+  EXPECT_TRUE(selector->isVisible());
+}
+
 TEST(MonitorWindow, SelectorUsesGraphiteColors)
 {
   DeCANstructor2::FrameModel model;
@@ -481,6 +502,17 @@ TEST(MonitorWindow, VirtualizedChoicesReachLastStreamAndMixedRowsScroll)
   ASSERT_TRUE(last);
   EXPECT_NE(last->getText().find("00000FFF"), tgui::String::npos);
   EXPECT_LT(choices->getWidgets().size(), 25U);
+  point = last->getAbsolutePosition() + tgui::Vector2f{5, 5};
+  window.gui().getContainer()->leftMousePressed(point);
+  window.gui().getContainer()->leftMouseReleased(point);
+  window.update(model, 0, 10);
+  last = choices->get<tgui::CheckBox>("choice4095");
+  ASSERT_TRUE(last);
+  EXPECT_FALSE(last->isChecked());
+  EXPECT_NE(
+    window.gui().get<tgui::Label>("status")->getText().find("4095/4096"),
+    tgui::String::npos);
+  EXPECT_EQ(table->getVerticalScrollbar()->getValue(), 0U);
 }
 
 TEST(MonitorWindow, ShrinkingFdClearsUnusedCellsAndHighlights)
