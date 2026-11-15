@@ -23,10 +23,12 @@
 
 #include <array>
 #include <map>
+#include <optional>
 #include <vector>
 #include <TGUI/TGUI.hpp>
 #include <TGUI/Backend/SFML-Graphics.hpp>
 #include "decanstructor2/frame_model.hpp"
+#include "decanstructor2/stream_view.hpp"
 
 namespace DeCANstructor2
 {
@@ -45,13 +47,24 @@ private:
   tgui::ScrollablePanel::Ptr frames_;
   tgui::Label::Ptr status_;
   tgui::Label::Ptr selected_;
-  std::map<FrameKey, size_t> row_indices_;
+  tgui::Label::Ptr empty_;
+  tgui::ChildWindow::Ptr selector_;
+  tgui::ScrollablePanel::Ptr choices_;
+  tgui::Button::Ptr sort_;
+  StreamView view_;
   std::vector<FrameKey> row_keys_;
+  std::vector<FrameKey> choice_keys_;
   std::vector<float> row_offsets_;
-  size_t selected_index_ = 0;
+  std::optional<FrameKey> selected_key_;
+  bool initial_selection_done_ = false;
+  bool projection_dirty_ = true;
+  size_t known_count_ = 0;
+  int bulk_ = 0;
+  size_t choice_begin_ = 0;
+  size_t choice_end_ = 0;
   size_t visible_begin_ = 0;
   size_t visible_end_ = 0;
-  void select_row(size_t index);
+  void select_row(const FrameKey & key);
 };
 }  // namespace DeCANstructor2
 #endif  // DECANSTRUCTOR2__MONITOR_WINDOW_HPP_

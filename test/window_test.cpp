@@ -176,6 +176,7 @@ TEST(MonitorWindow, HeadersTrackColumnsAndNarrowWindowsPreserveCellWidths)
   ASSERT_TRUE(columns);
   auto header = columns->get<tgui::Panel>("header");
   ASSERT_TRUE(header);
+  ASSERT_TRUE(header->get<tgui::Button>("id"));
   auto row = table->get<tgui::Panel>("row0");
   ASSERT_TRUE(row);
   for (const auto width : {1280.f, 1000.f}) {
@@ -183,7 +184,7 @@ TEST(MonitorWindow, HeadersTrackColumnsAndNarrowWindowsPreserveCellWidths)
     window.gui().setAbsoluteView({0, 0, width, height});
     window.update(model, 0, 100);
     EXPECT_FLOAT_EQ(
-      header->get<tgui::Label>("id")->getPosition().x,
+      header->get<tgui::Button>("id")->getPosition().x,
       row->get<tgui::Label>("id")->getPosition().x);
     EXPECT_EQ(table->getHorizontalScrollbar()->getValue(), 0U);
     EXPECT_LE(row->getSize().x, table->getSize().x - 20);
@@ -234,7 +235,7 @@ TEST(MonitorWindow, ScrollsLargeModelWithBoundedVisibleWidgets)
   EXPECT_LT(table->getWidgets().size(), 10U);
 }
 
-TEST(MonitorWindow, LateEarlierKeyKeepsRowsAndSelectionStable)
+TEST(MonitorWindow, LateEarlierKeyReordersRowsAndKeepsSelection)
 {
   DeCANstructor2::FrameModel model;
   DeCANstructor2::MonitorWindow window;
@@ -259,9 +260,178 @@ TEST(MonitorWindow, LateEarlierKeyKeepsRowsAndSelectionStable)
   auto late = table->get<tgui::Panel>("row1");
   ASSERT_TRUE(row);
   ASSERT_TRUE(late);
-  EXPECT_EQ(row->get<tgui::Label>("byte0")->getText(), tgui::String("AB"));
-  EXPECT_EQ(late->get<tgui::Label>("byte0")->getText(), tgui::String("CD"));
+  EXPECT_EQ(row->get<tgui::Label>("byte0")->getText(), tgui::String("CD"));
+  EXPECT_EQ(late->get<tgui::Label>("byte0")->getText(), tgui::String("AB"));
   EXPECT_NE(window.gui().get<tgui::Label>("selected")->getText().find("/z"), tgui::String::npos);
+}
+
+TEST(MonitorWindow, NumericSortButtonReordersRowsAndPreservesSelection)
+{
+  DeCANstructor2::FrameModel model;
+  DeCANstructor2::MonitorWindow window;
+  DeCANstructor2::Frame frame;
+  frame.length = 1;
+  for (const auto & entry : {std::pair<const char *, unsigned>{"/a", 256},
+      {"/b", 16}, {"/c", 2}, {"/d", 16}})
+  {
+    frame.key.source = entry.first;
+    frame.key.id = entry.second;
+    frame.data = {static_cast<uint8_t>(entry.second)};
+    ASSERT_TRUE(model.ingest(frame, 10));
+  }
+  window.update(model, 0, 10);
+  auto table = window.gui().get<tgui::ScrollablePanel>("frames");
+  auto source = [&](size_t index) {
+      return table->get<tgui::Panel>("row" + std::to_string(index))->
+             get<tgui::Label>("source")->getText();
+    };
+  EXPECT_EQ(source(0), "/c");
+  EXPECT_EQ(source(1), "/b");
+  EXPECT_EQ(source(2), "/d");
+  EXPECT_EQ(source(3), "/a");
+  auto row = table->get<tgui::Panel>("row1");
+  auto point = row->getAbsolutePosition() + tgui::Vector2f{5, 5};
+  window.gui().getContainer()->leftMousePressed(point);
+  window.gui().getContainer()->leftMouseReleased(point);
+  window.update(model, 0, 10);
+  auto header = window.gui().get<tgui::Panel>("columns")->get<tgui::Panel>("header");
+  auto button = header->get<tgui::Button>("id");
+  ASSERT_TRUE(button);
+  point = button->getAbsolutePosition() + tgui::Vector2f{5, 5};
+  window.gui().getContainer()->leftMousePressed(point);
+  window.gui().getContainer()->leftMouseReleased(point);
+  window.update(model, 0, 10);
+  EXPECT_EQ(source(0), "/a");
+  EXPECT_EQ(source(1), "/b");
+  EXPECT_EQ(source(2), "/d");
+  EXPECT_EQ(source(3), "/c");
+  EXPECT_NE(window.gui().get<tgui::Label>("selected")->getText().find("/b"), tgui::String::npos);
+  row = table->get<tgui::Panel>("row0");
+  point = row->getAbsolutePosition() + tgui::Vector2f{5, 5};
+  window.gui().getContainer()->leftMousePressed(point);
+  window.gui().getContainer()->leftMouseReleased(point);
+  window.update(model, 0, 10);
+  EXPECT_NE(window.gui().get<tgui::Label>("selected")->getText().find("/a"), tgui::String::npos);
+}
+
+TEST(MonitorWindow, StreamControlsHideAndRestoreWhileReceptionContinues)
+{
+  DeCANstructor2::FrameModel model;
+  DeCANstructor2::MonitorWindow window;
+  DeCANstructor2::Frame frame;
+  frame.key.source = "/first";
+  frame.length = 1;
+  frame.data = {0x12};
+  ASSERT_TRUE(model.ingest(frame, 10));
+  window.update(model, 0, 10);
+  auto click = [&](const tgui::Widget::Ptr & widget) {
+      ASSERT_TRUE(widget);
+      const auto point = widget->getAbsolutePosition() + tgui::Vector2f{5, 5};
+      window.gui().getContainer()->leftMousePressed(point);
+      window.gui().getContainer()->leftMouseReleased(point);
+      window.update(model, 0, 10);
+    };
+  click(window.gui().get<tgui::Button>("streams_toggle"));
+  auto selector = window.gui().get<tgui::ChildWindow>("stream_selector");
+  ASSERT_TRUE(selector);
+  click(selector->get<tgui::Button>("hide_all"));
+  EXPECT_EQ(window.gui().get<tgui::ScrollablePanel>("frames")->getWidgets().size(), 0U);
+  EXPECT_EQ(window.gui().get<tgui::Label>("selected")->getText().find("/first"),
+    tgui::String::npos);
+  EXPECT_TRUE(window.gui().get<tgui::Label>("empty_hint")->isVisible());
+  EXPECT_NE(window.gui().get<tgui::Label>("empty_hint")->getText().find("reception continues"),
+    tgui::String::npos);
+  EXPECT_NE(window.gui().get<tgui::Label>("status")->getText().find("0/1"), tgui::String::npos);
+  frame.data[0] = 0x34;
+  ASSERT_TRUE(model.ingest(frame, 20));
+  frame.key.source = "/late";
+  ASSERT_TRUE(model.ingest(frame, 30));
+  window.update(model, 0, 30);
+  auto table = window.gui().get<tgui::ScrollablePanel>("frames");
+  ASSERT_TRUE(table->get<tgui::Panel>("row0"));
+  EXPECT_EQ(table->get<tgui::Panel>("row0")->get<tgui::Label>("source")->getText(), "/late");
+  click(selector->get<tgui::Button>("show_all"));
+  auto first = table->get<tgui::Panel>("row0");
+  ASSERT_TRUE(first);
+  EXPECT_EQ(first->get<tgui::Label>("byte0")->getText(), "34");
+  EXPECT_EQ(first->get<tgui::Label>("count")->getText(), "2");
+  EXPECT_EQ(window.gui().get<tgui::Label>("selected")->getText(), "Select a frame");
+}
+
+TEST(MonitorWindow, CheckboxUsesFullKeyAndDoesNotReselectAfterRestore)
+{
+  DeCANstructor2::FrameModel model;
+  DeCANstructor2::MonitorWindow window;
+  DeCANstructor2::Frame frame;
+  frame.key.source = "/same";
+  frame.key.id = 7;
+  frame.length = 1;
+  frame.data = {0x12};
+  ASSERT_TRUE(model.ingest(frame, 10));
+  frame.key.format = DeCANstructor2::FrameFormat::FD;
+  frame.data[0] = 0x34;
+  ASSERT_TRUE(model.ingest(frame, 10));
+  window.update(model, 0, 10);
+  auto click = [&](const tgui::Widget::Ptr & widget) {
+      ASSERT_TRUE(widget);
+      const auto point = widget->getAbsolutePosition() + tgui::Vector2f{5, 5};
+      window.gui().getContainer()->leftMousePressed(point);
+      window.gui().getContainer()->leftMouseReleased(point);
+      window.update(model, 0, 10);
+    };
+  click(window.gui().get<tgui::Button>("streams_toggle"));
+  auto selector = window.gui().get<tgui::ChildWindow>("stream_selector");
+  auto choices = selector->get<tgui::ScrollablePanel>("stream_choices");
+  auto checkbox = choices->get<tgui::CheckBox>("choice0");
+  ASSERT_TRUE(checkbox);
+  click(checkbox);
+  auto table = window.gui().get<tgui::ScrollablePanel>("frames");
+  auto row = table->get<tgui::Panel>("row0");
+  ASSERT_TRUE(row);
+  EXPECT_EQ(row->get<tgui::Label>("format")->getText(), "FD");
+  EXPECT_EQ(row->get<tgui::Label>("byte0")->getText(), "34");
+  EXPECT_EQ(window.gui().get<tgui::Label>("selected")->getText(), "Select a frame");
+  checkbox = choices->get<tgui::CheckBox>("choice0");
+  click(checkbox);
+  EXPECT_EQ(window.gui().get<tgui::Label>("selected")->getText(), "Select a frame");
+  ASSERT_TRUE(table->get<tgui::Panel>("row1"));
+}
+
+TEST(MonitorWindow, VirtualizedChoicesReachLastStreamAndMixedRowsScroll)
+{
+  DeCANstructor2::FrameModel model;
+  DeCANstructor2::MonitorWindow window;
+  DeCANstructor2::Frame frame;
+  frame.key.extended = true;
+  frame.length = 1;
+  frame.data = {0xAB};
+  for (unsigned int i = 0; i < 4096; ++i) {
+    frame.key.id = i;
+    frame.key.format = i % 2 ? DeCANstructor2::FrameFormat::FD :
+      DeCANstructor2::FrameFormat::Classic;
+    ASSERT_TRUE(model.ingest(frame, 10));
+  }
+  window.update(model, 0, 10);
+  auto table = window.gui().get<tgui::ScrollablePanel>("frames");
+  table->getVerticalScrollbar()->setValue(table->getVerticalScrollbar()->getMaximum());
+  window.update(model, 0, 10);
+  ASSERT_TRUE(table->get<tgui::Panel>("row4095"));
+  EXPECT_TRUE(table->get<tgui::Panel>("row4095")->get<tgui::Label>("byte63"));
+  EXPECT_LT(table->getWidgets().size(), 30U);
+  auto toggle = window.gui().get<tgui::Button>("streams_toggle");
+  auto point = toggle->getAbsolutePosition() + tgui::Vector2f{5, 5};
+  window.gui().getContainer()->leftMousePressed(point);
+  window.gui().getContainer()->leftMouseReleased(point);
+  window.update(model, 0, 10);
+  auto selector = window.gui().get<tgui::ChildWindow>("stream_selector");
+  auto choices = selector->get<tgui::ScrollablePanel>("stream_choices");
+  EXPECT_LT(choices->getWidgets().size(), 25U);
+  choices->getVerticalScrollbar()->setValue(choices->getVerticalScrollbar()->getMaximum());
+  window.update(model, 0, 10);
+  auto last = choices->get<tgui::CheckBox>("choice4095");
+  ASSERT_TRUE(last);
+  EXPECT_NE(last->getText().find("00000FFF"), tgui::String::npos);
+  EXPECT_LT(choices->getWidgets().size(), 25U);
 }
 
 TEST(MonitorWindow, ShrinkingFdClearsUnusedCellsAndHighlights)
