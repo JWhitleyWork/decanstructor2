@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Compile and run the frame model tests without ROS or Docker.
+# Compile and run the frame model and stream view tests without ROS or Docker.
 set -euo pipefail
 root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)
 build_dir=$(mktemp -d "${TMPDIR:-/tmp}/dc2-model-test.XXXXXXXX")
@@ -11,3 +11,7 @@ read -r -a flags <<< "${CXXFLAGS:-}"
   "$root/test/frame_model_test.cpp" "$root/src/frame_model.cpp" \
   -o "$build_dir/frame_model_test"
 "$build_dir/frame_model_test"
+"${CXX:-c++}" "${flags[@]}" -std=c++17 -UNDEBUG -I"$root/include" \
+  "$root/test/stream_view_test.cpp" "$root/src/frame_model.cpp" \
+  -o "$build_dir/stream_view_test"
+"$build_dir/stream_view_test"

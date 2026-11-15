@@ -12,11 +12,11 @@ repos:
   - repo: local
     hooks:
       - id: model-tests
-        name: ROS-free frame model tests
+        name: ROS-free frame model and stream view tests
         entry: tools/run-model-tests.sh
         language: system
         pass_filenames: false
-        files: ^(src/frame_model\.cpp|include/decanstructor2/frame_model\.hpp|test/frame_model_test\.cpp|tools/run-model-tests\.sh)$
+        files: ^(src/frame_model\.cpp|include/decanstructor2/(frame_model|stream_view)\.hpp|test/(frame_model|stream_view)_test\.cpp|tools/run-model-tests\.sh)$
       - id: shell-syntax
         name: Bash syntax
         entry: bash -c 'for file in "$@"; do bash -n -- "$file" || exit; done' --
