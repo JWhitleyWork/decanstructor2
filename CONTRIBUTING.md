@@ -25,6 +25,20 @@ CI runs these checks before its ROS distribution matrix. The full builds and
 installed GUI smoke tests require Docker and the dependencies described in
 the README; quick checks are not a replacement for those integration tests.
 
+## Build and test
+
+Follow the [build instructions](README.md#build), including installing `xvfb`
+and `xauth` for tests. From the built and sourced workspace root, run:
+
+```bash
+colcon test
+colcon test-result --verbose
+```
+
+The dependency manifest pins the SFML 2/3 compatibility fix on the vendor fork
+because write access to the upstream vendor is not available. TGUI remains at
+v1.10.0.
+
 ## GUI validation
 
 The [monitor guide](docs/monitor.md) describes the expected user-facing behavior.
@@ -72,7 +86,7 @@ captures and application logs are under `smoke/` in each
 When changing the layout, inspect both sizes for readable MESSAGE IDS entries,
 unobstructed metadata, usable all-hidden recovery, and complete FD matrices.
 Update `docs/screenshots/monitor.png` with the actual default-size application
-capture used by the README; keep its caption truthful, not a generated mockup.
+capture used by the monitor guide; keep its caption truthful, not a generated mockup.
 
 ### Node and GUI ownership
 

@@ -91,11 +91,11 @@ endif()
 
 if(ROS_DISTRO STREQUAL "humble" OR ROS_DISTRO STREQUAL "jazzy")
   ament_auto_package(
-    INSTALL_TO_SHARE launch
+    INSTALL_TO_SHARE launch docs
     USE_SCOPED_HEADER_INSTALL_DIR
   )
 else()
   ament_auto_package(
-    INSTALL_TO_SHARE launch
+    INSTALL_TO_SHARE launch docs
   )
 endif()

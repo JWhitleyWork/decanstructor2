@@ -1,12 +1,36 @@
 # Using the monitor
 
-[Back to README](../README.md#monitor)
-
 DeCANstructor2 displays classic CAN and CAN-FD messages received from ROS 2.
-It does not transmit CAN frames. See the [build instructions](../README.md#build)
-and [topic configuration](../README.md#run) before starting the application.
+It does not transmit CAN frames. See the repository's
+[build and installation instructions](https://github.com/JWhitleyWork/decanstructor2#build)
+if the package is not installed yet.
+
+## Launch and configure topics
+
+After sourcing the workspace's `install/setup.bash`, start the monitor:
+
+```bash
+ros2 run decanstructor2 decanstructor2_node_exe
+```
+
+The `classic_topic` parameter defaults to `can_in` (`can_msgs/msg/Frame`), and
+`fd_topic` defaults to `can_fd_in` (`ros2_socketcan_msgs/msg/FdFrame`). Set either
+parameter to an empty string to disable that subscription. For example, to
+receive classic CAN only:
+
+```bash
+ros2 run decanstructor2 decanstructor2_node_exe --ros-args -p classic_topic:=can_in -p "fd_topic:=''"
+```
+
+Both subscriptions use best-effort QoS. Classic frames support up to 8 data
+bytes and CAN-FD frames up to 64. A separate driver or ROS publisher must supply
+the messages; the monitor does not provide a CAN driver or decode DBC files.
 
 ## Layout
+
+![DeCANstructor2 monitor showing CAN rows, MESSAGE IDS sidebar, and FRAME METADATA below the table](screenshots/monitor.png)
+
+*Actual application capture using synthetic ROS messages, not a design mockup.*
 
 - **Main table:** one row per message identity, with source, numeric CAN ID,
   format, payload length, payload bytes, receive count and mean receipt interval.
@@ -18,7 +42,6 @@ and [topic configuration](../README.md#run) before starting the application.
 - **Status bar:** visible/total message IDs, rejected frames and timing/highlight
   reminders.
 
-The [README screenshot](../README.md#monitor) is an actual application capture.
 The layout is checked at 1280×800 and at the narrower 1000×600 size. Longer
 message lists scroll; visible FD payloads remain expanded.
 
@@ -89,4 +112,5 @@ the table so inspecting metadata never requires collapsing another FD row.
 
 Press **Escape**, close the application window, or press **Ctrl+C** in its
 launching terminal. For developer checks of layout, filtering and shutdown,
-see [GUI validation](../CONTRIBUTING.md#gui-validation).
+see the repository's
+[GUI validation guide](https://github.com/JWhitleyWork/decanstructor2/blob/main/CONTRIBUTING.md#gui-validation).

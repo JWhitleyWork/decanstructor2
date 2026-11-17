@@ -1,59 +1,9 @@
 # DeCANstructor2
 
-DeCANstructor2 is a receive-only ROS 2 monitor for classic CAN and CAN-FD frames.
-The supported distro targets are Humble, Jazzy, Kilted, Lyrical, and Rolling.
-
-## Monitor
-
-![DeCANstructor2 monitor showing CAN rows, MESSAGE IDS sidebar, and FRAME METADATA below the table](docs/screenshots/monitor.png)
-
-*Actual application capture using synthetic ROS messages, not a design mockup.*
-
-Use **MESSAGE IDS** on the right to show or hide rows directly. Select a table
-row to inspect **FRAME METADATA**, arranged horizontally beneath the table.
-See the [monitor guide](docs/monitor.md) for controls, field meanings and selection
-behavior.
-
-The table is designed for spotting payload changes without opening an inspector:
-
-- **Classic CAN:** compact rows with up to eight bytes.
-- **CAN FD:** an always-expanded 8×8 byte matrix in every row, including
-  unselected frames. Unused offsets show `--`, not invented data.
-- **Change highlighting:** individual bytes turn amber for one second after a
-  change. Small hexadecimal row offsets identify positions within an FD payload.
-- **Frame metadata:** select a row to see its source, ID, format and flags in the
-  horizontal **FRAME METADATA** panel below the table; the payload stays in the table.
-
-Count and mean receipt interval remain alongside each payload. The interval is
-measured with a steady clock and is not a bus timestamp. Scroll through longer
-message lists without collapsing FD payloads. Press **Escape**, close the window,
-or use **Ctrl+C** in the launching terminal to exit.
-
-### MESSAGE IDS and ID sorting
-
-The permanent **MESSAGE IDS** sidebar on the right contains a scrollable
-checklist of known message identities. Uncheck an entry to hide its row, or use
-**Show all / Hide all** for the identities currently known. Hidden entries keep
-receiving: showing one again reveals its latest payload, count and timing,
-without restarting the byte-change highlight timer. A newly discovered identity
-starts visible, even after **Hide all**. Visibility choices last for the current
-application session only.
-
-Each checklist entry identifies the source, CAN ID, classic/FD format and flags;
-hover for its complete label. Entries sharing an ID remain independently
-selectable when their source, flags or format differ. The status bar reports
-visible/total message IDs, and an all-hidden view explains how to show them again.
-
-The table starts in ascending **numeric CAN ID** order. Click the **ID ^ / ID v**
-header to reverse the ID direction; equal-ID entries keep a deterministic order
-by source and remaining identity fields. Sorting or hiding another entry keeps
-the selected row's metadata in the horizontal **FRAME METADATA** panel below the
-table. Hiding the selected row clears the selection; showing it again does not
-select it automatically. Explicit sort/visibility changes scroll the table to the
-top.
-
-These controls affect the display only: subscriptions and the 4096-identity limit
-are unchanged, and every visible FD row retains its complete inline matrix.
+DeCANstructor2 is a receive-only ROS 2 graphical monitor for classic CAN and
+CAN-FD messages. It supports Humble, Jazzy, Kilted, Lyrical, and Rolling.
+A separate CAN driver or ROS publisher supplies the messages; the package does
+not transmit frames or decode DBC files.
 
 ## Build
 
@@ -74,62 +24,16 @@ colcon build --cmake-args -DCMAKE_BUILD_TYPE=Debug
 source install/setup.bash
 ```
 
-For tests, install `xvfb` and `xauth` before building (tests are enabled by default). Then run:
+Tests are enabled by default; install `xvfb` and `xauth` before building.
+To build without tests, add `-DBUILD_TESTING=OFF` to the CMake arguments.
+The build installs the package into the workspace's `install/` directory.
+Source `~/dc2_ws/install/setup.bash` in each new terminal before using it.
 
-```bash
-colcon test
-colcon test-result --verbose
-```
+## Documentation
 
-The CI container additionally runs an installed-app graphical smoke test under
-Xvfb using `tools/run-tests.sh`; its image includes `xdotool` and ImageMagick.
-It publishes one classic and two distinct 64-byte FD message identities, and
-captures default and narrow windows in visible, hidden and restored states for
-visual inspection. The message-ID count check does not verify the appearance or
-contents of those screenshots.
+- [Monitor guide](docs/monitor.md): launching, topic configuration, controls and
+  display reference.
+- [Contributing](CONTRIBUTING.md): development checks, tests and GUI validation.
 
-The manifest currently pins the small SFML 2/3 compatibility fix on the vendor
-fork because write access to the upstream vendor is not available. TGUI remains
-at v1.10.0.
-
-## Run
-
-```bash
-ros2 run decanstructor2 decanstructor2_node_exe
-```
-
-The `classic_topic` parameter defaults to `can_in` (`can_msgs/msg/Frame`), and
-`fd_topic` defaults to `can_fd_in` (`ros2_socketcan_msgs/msg/FdFrame`). Set either
-parameter to an empty string to disable that subscription. For example:
-
-```bash
-ros2 run decanstructor2 decanstructor2_node_exe --ros-args -p classic_topic:=can_in -p "fd_topic:=''"
-```
-
-Both subscriptions use best-effort QoS. Classic frames support up to 8 data
-bytes and CAN-FD frames up to 64. A row identifies a message by topic,
-`header.frame_id`, CAN ID, flags and classic/FD format. It displays the receive
-count and mean interval between receptions measured with a steady clock.
-The graphite-themed table keeps classic rows compact and shows every FD payload
-in its row as an 8-by-8 byte matrix, with placeholders for unused bytes. Bytes
-changed within the last second have an amber highlight. The horizontal
-**FRAME METADATA** panel below the table shows metadata only; selecting a frame
-is not needed to see its payload. The monitor holds at most 4096 distinct message
-identities: once full, new identities are rejected while existing ones continue.
-
-## Development checks
-
-See [CONTRIBUTING.md](CONTRIBUTING.md#quick-checks) to install the pre-commit
-hook and run fast checks without ROS or Docker. These include repository hygiene,
-YAML/XML and Bash syntax checks, and standalone frame-model/stream-view unit
-tests. CI runs the same quick checks before the five-distribution ROS build,
-test and GUI smoke matrix; the quick checks do not replace that integration
-coverage. See [GUI validation](CONTRIBUTING.md#gui-validation) for focused layout
-tests, smoke captures and screenshot maintenance.
-
-## Scope and limitations
-
-This milestone only receives ROS messages; it does not transmit frames, decode
-DBC files, or provide a CAN driver. A separate driver or publisher is needed.
-The `FdFrame` message does not expose CAN-FD BRS or ESI flags, so they cannot be
-shown or distinguished by this monitor.
+The `docs/` directory, including screenshots, is also installed under
+`share/decanstructor2/docs/` in the package prefix.
