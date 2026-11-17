@@ -5,6 +5,10 @@ CAN-FD messages. It supports Humble, Jazzy, Kilted, Lyrical, and Rolling.
 A separate CAN driver or ROS publisher supplies the messages; the package does
 not transmit frames or decode DBC files.
 
+![DeCANstructor2 monitor](docs/screenshots/monitor.png)
+
+*Actual application capture using synthetic ROS messages.*
+
 ## Build
 
 Install ROS 2 for your distro, `git`, `python3-vcstool`, `python3-rosdep`,
