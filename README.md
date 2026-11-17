@@ -9,6 +9,11 @@ The supported distro targets are Humble, Jazzy, Kilted, Lyrical, and Rolling.
 
 *Actual application capture using synthetic ROS messages, not a design mockup.*
 
+Use **MESSAGE IDS** on the right to show or hide rows directly. Select a table
+row to inspect **FRAME METADATA**, arranged horizontally beneath the table.
+See the [monitor guide](docs/monitor.md) for controls, field meanings and selection
+behavior.
+
 The table is designed for spotting payload changes without opening an inspector:
 
 - **Classic CAN:** compact rows with up to eight bytes.
@@ -21,7 +26,7 @@ The table is designed for spotting payload changes without opening an inspector:
 
 Count and mean receipt interval remain alongside each payload. The interval is
 measured with a steady clock and is not a bus timestamp. Scroll through longer
-message rows without collapsing FD payloads. Press **Escape**, close the window,
+message lists without collapsing FD payloads. Press **Escape**, close the window,
 or use **Ctrl+C** in the launching terminal to exit.
 
 ### MESSAGE IDS and ID sorting
@@ -109,17 +114,18 @@ The graphite-themed table keeps classic rows compact and shows every FD payload
 in its row as an 8-by-8 byte matrix, with placeholders for unused bytes. Bytes
 changed within the last second have an amber highlight. The horizontal
 **FRAME METADATA** panel below the table shows metadata only; selecting a frame
-is not needed to see its payload. The monitor
-holds at most 4096 distinct message identities: once full, new identities are
-rejected while existing ones continue.
+is not needed to see its payload. The monitor holds at most 4096 distinct message
+identities: once full, new identities are rejected while existing ones continue.
 
 ## Development checks
 
 See [CONTRIBUTING.md](CONTRIBUTING.md#quick-checks) to install the pre-commit
 hook and run fast checks without ROS or Docker. These include repository hygiene,
-YAML/XML and Bash syntax checks, and standalone frame-model/stream-view unit tests. CI runs
-the same quick checks before the five-distribution ROS build, test and GUI smoke
-matrix; the quick checks do not replace that integration coverage.
+YAML/XML and Bash syntax checks, and standalone frame-model/stream-view unit
+tests. CI runs the same quick checks before the five-distribution ROS build,
+test and GUI smoke matrix; the quick checks do not replace that integration
+coverage. See [GUI validation](CONTRIBUTING.md#gui-validation) for focused layout
+tests, smoke captures and screenshot maintenance.
 
 ## Scope and limitations
 
