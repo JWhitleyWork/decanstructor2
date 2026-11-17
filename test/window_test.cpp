@@ -18,6 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 #include <gtest/gtest.h>
+#include <memory>
 #include "decanstructor2/monitor_window.hpp"
 
 namespace
@@ -25,6 +26,23 @@ namespace
 tgui::Color background(const tgui::Label::Ptr & byte)
 {
   return byte->getRenderer()->getBackgroundColor();
+}
+tgui::String metadata_text(DeCANstructor2::MonitorWindow & window)
+{
+  const auto panel = window.gui().get<tgui::Panel>("metadata");
+  EXPECT_TRUE(panel);
+  if (!panel) {return {};}
+  const auto hint = panel->get<tgui::Label>("selection_hint");
+  EXPECT_TRUE(hint);
+  if (!hint) {return {};}
+  if (hint->isVisible()) {return hint->getText();}
+  tgui::String text;
+  for (const auto name : {"id", "source", "format", "flags", "brs_esi"}) {
+    const auto field = panel->get<tgui::Label>(name);
+    EXPECT_TRUE(field);
+    if (field) {text += field->getText() + " ";}
+  }
+  return text;
 }
 }  // namespace
 
@@ -69,7 +87,7 @@ TEST(MonitorWindow, UnselectedFdRowsExposeAllBytesAndExpireHighlights)
   window.gui().getContainer()->leftMousePressed(
     third_last->getAbsolutePosition() + tgui::Vector2f{4, 4});
   window.update(model, 0, 100);
-  const auto selected_text = window.gui().get<tgui::Label>("selected")->getText();
+  const auto selected_text = metadata_text(window);
   EXPECT_NE(selected_text.find("/fd3"), tgui::String::npos);
   frame.data[63] = 0xEF;
   ASSERT_TRUE(model.ingest(frame, 200));
@@ -116,14 +134,14 @@ TEST(MonitorWindow, ShortFdAndClassicRemoteHaveNoInventedPayload)
   EXPECT_EQ(fdrow->get<tgui::Label>("byte63")->getText(), tgui::String("--"));
   EXPECT_LT(remote_row->getSize().y, fdrow->getSize().y);
   EXPECT_EQ(remote_row->get<tgui::Label>("byte0")->getText(), tgui::String("--"));
-  const auto metadata = window.gui().get<tgui::Label>("selected")->getText();
+  const auto metadata = metadata_text(window);
   EXPECT_EQ(metadata.find("AB"), tgui::String::npos);
   const auto status = window.gui().get<tgui::Label>("status")->getText();
   EXPECT_NE(status.find("Rejected: 1"), tgui::String::npos);
   window.gui().getContainer()->leftMousePressed(
     remote_row->getAbsolutePosition() + tgui::Vector2f{5, 5});
   window.update(model, 1, 100);
-  const auto remote_metadata = window.gui().get<tgui::Label>("selected")->getText();
+  const auto remote_metadata = metadata_text(window);
   EXPECT_NE(remote_metadata.find("/remote"), tgui::String::npos);
   EXPECT_NE(remote_metadata.find("RTR"), tgui::String::npos);
 }
@@ -189,6 +207,7 @@ TEST(MonitorWindow, HeadersTrackColumnsAndNarrowWindowsPreserveCellWidths)
     EXPECT_EQ(table->getHorizontalScrollbar()->getValue(), 0U);
     EXPECT_LE(row->getSize().x, table->getSize().x - 20);
     const float viewport_right = table->getPosition().x + table->getSize().x - 20;
+    const float viewport_bottom = table->getPosition().y + table->getSize().y;
     for (size_t index = 0; index < 2; ++index) {
       auto fd_row = table->get<tgui::Panel>("row" + std::to_string(index));
       ASSERT_TRUE(fd_row);
@@ -198,6 +217,8 @@ TEST(MonitorWindow, HeadersTrackColumnsAndNarrowWindowsPreserveCellWidths)
         EXPECT_EQ(byte->getText(), tgui::String("AB"));
         EXPECT_GE(byte->getSize().x, 27.f);
         EXPECT_LE(byte->getAbsolutePosition().x + byte->getSize().x, viewport_right);
+        EXPECT_GE(byte->getAbsolutePosition().y, table->getPosition().y);
+        EXPECT_LE(byte->getAbsolutePosition().y + byte->getSize().y, viewport_bottom);
         EXPECT_LE(byte->getPosition().y + byte->getSize().y, fd_row->getSize().y);
       }
     }
@@ -251,7 +272,7 @@ TEST(MonitorWindow, LateEarlierKeyReordersRowsAndKeepsSelection)
   window.gui().getContainer()->leftMousePressed(
     row->getAbsolutePosition() + tgui::Vector2f{5, 5});
   window.update(model, 0, 10);
-  EXPECT_NE(window.gui().get<tgui::Label>("selected")->getText().find("/z"), tgui::String::npos);
+  EXPECT_NE(metadata_text(window).find("/z"), tgui::String::npos);
   frame.key.source = "/a";
   frame.data[0] = 0xCD;
   ASSERT_TRUE(model.ingest(frame, 20));
@@ -262,7 +283,7 @@ TEST(MonitorWindow, LateEarlierKeyReordersRowsAndKeepsSelection)
   ASSERT_TRUE(late);
   EXPECT_EQ(row->get<tgui::Label>("byte0")->getText(), tgui::String("CD"));
   EXPECT_EQ(late->get<tgui::Label>("byte0")->getText(), tgui::String("AB"));
-  EXPECT_NE(window.gui().get<tgui::Label>("selected")->getText().find("/z"), tgui::String::npos);
+  EXPECT_NE(metadata_text(window).find("/z"), tgui::String::npos);
 }
 
 TEST(MonitorWindow, NumericSortButtonReordersRowsAndPreservesSelection)
@@ -289,6 +310,16 @@ TEST(MonitorWindow, NumericSortButtonReordersRowsAndPreservesSelection)
   EXPECT_EQ(source(1), "/b");
   EXPECT_EQ(source(2), "/d");
   EXPECT_EQ(source(3), "/a");
+  auto sidebar = window.gui().get<tgui::Panel>("message_ids");
+  ASSERT_TRUE(sidebar);
+  auto choices = sidebar->get<tgui::ScrollablePanel>("id_choices");
+  ASSERT_TRUE(choices);
+  const char * ordered_ids[] = {"002", "010", "010", "100"};
+  for (size_t i = 0; i < 4; ++i) {
+    auto choice = choices->get<tgui::CheckBox>("choice" + std::to_string(i));
+    ASSERT_TRUE(choice);
+    EXPECT_NE(choice->getText().find(ordered_ids[i]), tgui::String::npos);
+  }
   auto row = table->get<tgui::Panel>("row1");
   auto point = row->getAbsolutePosition() + tgui::Vector2f{5, 5};
   window.gui().getContainer()->leftMousePressed(point);
@@ -305,13 +336,13 @@ TEST(MonitorWindow, NumericSortButtonReordersRowsAndPreservesSelection)
   EXPECT_EQ(source(1), "/b");
   EXPECT_EQ(source(2), "/d");
   EXPECT_EQ(source(3), "/c");
-  EXPECT_NE(window.gui().get<tgui::Label>("selected")->getText().find("/b"), tgui::String::npos);
+  EXPECT_NE(metadata_text(window).find("/b"), tgui::String::npos);
   row = table->get<tgui::Panel>("row0");
   point = row->getAbsolutePosition() + tgui::Vector2f{5, 5};
   window.gui().getContainer()->leftMousePressed(point);
   window.gui().getContainer()->leftMouseReleased(point);
   window.update(model, 0, 10);
-  EXPECT_NE(window.gui().get<tgui::Label>("selected")->getText().find("/a"), tgui::String::npos);
+  EXPECT_NE(metadata_text(window).find("/a"), tgui::String::npos);
 }
 
 TEST(MonitorWindow, StreamControlsHideAndRestoreWhileReceptionContinues)
@@ -331,13 +362,12 @@ TEST(MonitorWindow, StreamControlsHideAndRestoreWhileReceptionContinues)
       window.gui().getContainer()->leftMouseReleased(point);
       window.update(model, 0, 10);
     };
-  click(window.gui().get<tgui::Button>("streams_toggle"));
-  auto selector = window.gui().get<tgui::ChildWindow>("stream_selector");
+  auto selector = window.gui().get<tgui::Panel>("message_ids");
   ASSERT_TRUE(selector);
   click(selector->get<tgui::Button>("hide_all"));
   EXPECT_EQ(window.gui().get<tgui::ScrollablePanel>("frames")->getWidgets().size(), 0U);
   EXPECT_EQ(
-    window.gui().get<tgui::Label>("selected")->getText().find("/first"),
+    metadata_text(window).find("/first"),
     tgui::String::npos);
   EXPECT_TRUE(window.gui().get<tgui::Label>("empty_hint")->isVisible());
   EXPECT_NE(
@@ -357,7 +387,7 @@ TEST(MonitorWindow, StreamControlsHideAndRestoreWhileReceptionContinues)
   ASSERT_TRUE(first);
   EXPECT_EQ(first->get<tgui::Label>("byte0")->getText(), "34");
   EXPECT_EQ(first->get<tgui::Label>("count")->getText(), "2");
-  EXPECT_EQ(window.gui().get<tgui::Label>("selected")->getText(), "Select a frame");
+  EXPECT_EQ(metadata_text(window), "Select a frame");
 }
 
 TEST(MonitorWindow, CheckboxUsesFullKeyAndDoesNotReselectAfterRestore)
@@ -381,9 +411,9 @@ TEST(MonitorWindow, CheckboxUsesFullKeyAndDoesNotReselectAfterRestore)
       window.gui().getContainer()->leftMouseReleased(point);
       window.update(model, 0, 10);
     };
-  click(window.gui().get<tgui::Button>("streams_toggle"));
-  auto selector = window.gui().get<tgui::ChildWindow>("stream_selector");
-  auto choices = selector->get<tgui::ScrollablePanel>("stream_choices");
+  auto selector = window.gui().get<tgui::Panel>("message_ids");
+  ASSERT_TRUE(selector);
+  auto choices = selector->get<tgui::ScrollablePanel>("id_choices");
   auto checkbox = choices->get<tgui::CheckBox>("choice0");
   ASSERT_TRUE(checkbox);
   click(checkbox);
@@ -392,10 +422,10 @@ TEST(MonitorWindow, CheckboxUsesFullKeyAndDoesNotReselectAfterRestore)
   ASSERT_TRUE(row);
   EXPECT_EQ(row->get<tgui::Label>("format")->getText(), "FD");
   EXPECT_EQ(row->get<tgui::Label>("byte0")->getText(), "34");
-  EXPECT_EQ(window.gui().get<tgui::Label>("selected")->getText(), "Select a frame");
+  EXPECT_EQ(metadata_text(window), "Select a frame");
   checkbox = choices->get<tgui::CheckBox>("choice0");
   click(checkbox);
-  EXPECT_EQ(window.gui().get<tgui::Label>("selected")->getText(), "Select a frame");
+  EXPECT_EQ(metadata_text(window), "Select a frame");
   ASSERT_TRUE(table->get<tgui::Panel>("row1"));
 }
 
@@ -413,8 +443,8 @@ TEST(MonitorWindow, BulkActionsAffectOnlyKeysKnownAtClick)
       window.gui().getContainer()->leftMousePressed(point);
       window.gui().getContainer()->leftMouseReleased(point);
     };
-  click(window.gui().get<tgui::Button>("streams_toggle"));
-  auto selector = window.gui().get<tgui::ChildWindow>("stream_selector");
+  auto selector = window.gui().get<tgui::Panel>("message_ids");
+  ASSERT_TRUE(selector);
   click(selector->get<tgui::Button>("hide_all"));
   // A callback is followed by ROS executor work before the next GUI update.
   DeCANstructor2::Frame late;
@@ -427,44 +457,113 @@ TEST(MonitorWindow, BulkActionsAffectOnlyKeysKnownAtClick)
   EXPECT_EQ(row->get<tgui::Label>("source")->getText(), "/late");
   EXPECT_EQ(table->getWidgets().size(), 1U);
   EXPECT_NE(window.gui().get<tgui::Label>("status")->getText().find("1/2"), tgui::String::npos);
-  EXPECT_EQ(window.gui().get<tgui::Label>("selected")->getText(), "Select a frame");
+  EXPECT_EQ(metadata_text(window), "Select a frame");
 }
 
-TEST(MonitorWindow, ClosedStreamSelectorCanBeReopened)
-{
-  DeCANstructor2::FrameModel model;
-  DeCANstructor2::MonitorWindow window;
-  window.update(model, 0, 10);
-  auto toggle = window.gui().get<tgui::Button>("streams_toggle");
-  const auto point = toggle->getAbsolutePosition() + tgui::Vector2f{5, 5};
-  window.gui().getContainer()->leftMousePressed(point);
-  window.gui().getContainer()->leftMouseReleased(point);
-  auto selector = window.gui().get<tgui::ChildWindow>("stream_selector");
-  ASSERT_TRUE(selector);
-  ASSERT_TRUE(selector->isVisible());
-  selector->close();  // The public operation invoked by the title-bar X button.
-  ASSERT_EQ(window.gui().get<tgui::ChildWindow>("stream_selector"), selector);
-  EXPECT_FALSE(selector->isVisible());
-  window.gui().getContainer()->leftMousePressed(point);
-  window.gui().getContainer()->leftMouseReleased(point);
-  window.update(model, 0, 10);
-  EXPECT_TRUE(selector->isVisible());
-}
-
-TEST(MonitorWindow, SelectorUsesGraphiteColors)
+TEST(MonitorWindow, PermanentMessageIdsAndHorizontalMetadataFitBothSizes)
 {
   DeCANstructor2::FrameModel model;
   DeCANstructor2::MonitorWindow window;
   DeCANstructor2::Frame frame;
+  frame.key.source = "/a/long/source/name/that/must/remain/available/in/the/tooltip";
+  frame.key.format = DeCANstructor2::FrameFormat::FD;
+  frame.length = 64;
+  frame.data.resize(64, 0xAB);
   ASSERT_TRUE(model.ingest(frame, 10));
   window.update(model, 0, 10);
-  auto selector = window.gui().get<tgui::ChildWindow>("stream_selector");
-  auto choices = selector->get<tgui::ScrollablePanel>("stream_choices");
-  EXPECT_EQ(selector->getRenderer()->getBackgroundColor(), tgui::Color(33, 36, 38));
-  EXPECT_EQ(choices->getRenderer()->getBackgroundColor(), tgui::Color(29, 32, 34));
-  auto choice = choices->get<tgui::CheckBox>("choice0");
-  ASSERT_TRUE(choice);
-  EXPECT_EQ(choice->getRenderer()->getTextColor(), tgui::Color(229, 231, 230));
+  auto table = window.gui().get<tgui::ScrollablePanel>("frames");
+  auto sidebar = window.gui().get<tgui::Panel>("message_ids");
+  auto metadata = window.gui().get<tgui::Panel>("metadata");
+  ASSERT_TRUE(table);
+  ASSERT_TRUE(sidebar);
+  ASSERT_TRUE(metadata);
+  ASSERT_TRUE(sidebar->get<tgui::Label>("title"));
+  EXPECT_EQ(sidebar->get<tgui::Label>("title")->getText(), "MESSAGE IDS");
+  ASSERT_TRUE(metadata->get<tgui::Label>("title"));
+  EXPECT_EQ(metadata->get<tgui::Label>("title")->getText(), "FRAME METADATA");
+  ASSERT_FALSE(window.gui().get<tgui::Button>("streams_toggle"));
+  ASSERT_FALSE(window.gui().get<tgui::ChildWindow>("stream_selector"));
+  for (const auto & widget : window.gui().getContainer()->getWidgets()) {
+    EXPECT_FALSE(std::dynamic_pointer_cast<tgui::ChildWindow>(widget));
+  }
+  auto hint = metadata->get<tgui::Label>("selection_hint");
+  auto choices = sidebar->get<tgui::ScrollablePanel>("id_choices");
+  auto hide = sidebar->get<tgui::Button>("hide_all");
+  auto show = sidebar->get<tgui::Button>("show_all");
+  ASSERT_TRUE(hint);
+  ASSERT_TRUE(choices);
+  ASSERT_TRUE(hide);
+  ASSERT_TRUE(show);
+  auto click = [&](const tgui::Widget::Ptr & widget) {
+      ASSERT_TRUE(widget);
+      const auto point = widget->getAbsolutePosition() + tgui::Vector2f{5, 5};
+      window.gui().getContainer()->leftMousePressed(point);
+      window.gui().getContainer()->leftMouseReleased(point);
+      window.update(model, 0, 10);
+    };
+  for (const auto width : {1280.f, 1000.f}) {
+    const float height = width == 1280.f ? 800.f : 600.f;
+    window.gui().setAbsoluteView({0, 0, width, height});
+    window.update(model, 0, 10);
+    EXPECT_TRUE(sidebar->isVisible());
+    EXPECT_GE(
+      sidebar->getAbsolutePosition().x,
+      table->getPosition().x + table->getSize().x);
+    EXPECT_LE(sidebar->getAbsolutePosition().x + sidebar->getSize().x, width);
+    EXPECT_GE(
+      metadata->getAbsolutePosition().y,
+      table->getPosition().y + table->getSize().y);
+    EXPECT_LE(
+      metadata->getAbsolutePosition().x + metadata->getSize().x,
+      sidebar->getAbsolutePosition().x);
+    EXPECT_LE(metadata->getAbsolutePosition().y + metadata->getSize().y, height);
+    auto row = table->get<tgui::Panel>("row0");
+    ASSERT_TRUE(row);
+    click(row);
+    EXPECT_FALSE(hint->isVisible());
+    std::vector<tgui::Label::Ptr> fields;
+    for (const auto name : {"id", "source", "format", "flags", "brs_esi"}) {
+      auto field = metadata->get<tgui::Label>(name);
+      ASSERT_TRUE(field);
+      EXPECT_TRUE(field->isVisible());
+      EXPECT_GE(field->getAbsolutePosition().x, metadata->getAbsolutePosition().x);
+      EXPECT_GE(field->getAbsolutePosition().y, metadata->getAbsolutePosition().y);
+      EXPECT_LE(
+        field->getAbsolutePosition().y + field->getSize().y,
+        metadata->getAbsolutePosition().y + metadata->getSize().y);
+      EXPECT_LE(
+        field->getAbsolutePosition().x + field->getSize().x,
+        metadata->getAbsolutePosition().x + metadata->getSize().x);
+      for (const auto & other : fields) {
+        EXPECT_TRUE(
+          field->getAbsolutePosition().x + field->getSize().x <= other->getAbsolutePosition().x ||
+          other->getAbsolutePosition().x + other->getSize().x <= field->getAbsolutePosition().x);
+      }
+      fields.push_back(field);
+    }
+    auto source = metadata->get<tgui::Label>("source");
+    auto tooltip = std::dynamic_pointer_cast<tgui::Label>(source->getToolTip());
+    ASSERT_TRUE(tooltip);
+    EXPECT_NE(tooltip->getText().find(frame.key.source), tgui::String::npos);
+    click(hide);
+    EXPECT_TRUE(sidebar->isVisible());
+    EXPECT_TRUE(hint->isVisible());
+    EXPECT_EQ(hint->getText(), "Select a frame");
+    EXPECT_EQ(table->getWidgets().size(), 0U);
+    click(show);
+    ASSERT_TRUE(table->get<tgui::Panel>("row0"));
+    auto choice = choices->get<tgui::CheckBox>("choice0");
+    ASSERT_TRUE(choice);
+    click(choice);
+    EXPECT_EQ(table->getWidgets().size(), 0U);
+    choice = choices->get<tgui::CheckBox>("choice0");
+    ASSERT_TRUE(choice);
+    click(choice);
+    ASSERT_TRUE(table->get<tgui::Panel>("row0"));
+    EXPECT_NE(
+      window.gui().get<tgui::Label>("status")->getText().find("Message IDs:"),
+      tgui::String::npos);
+  }
 }
 
 TEST(MonitorWindow, VirtualizedChoicesReachLastStreamAndMixedRowsScroll)
@@ -488,21 +587,19 @@ TEST(MonitorWindow, VirtualizedChoicesReachLastStreamAndMixedRowsScroll)
   ASSERT_TRUE(table->get<tgui::Panel>("row4095"));
   EXPECT_TRUE(table->get<tgui::Panel>("row4095")->get<tgui::Label>("byte63"));
   EXPECT_LT(table->getWidgets().size(), 30U);
-  auto toggle = window.gui().get<tgui::Button>("streams_toggle");
-  auto point = toggle->getAbsolutePosition() + tgui::Vector2f{5, 5};
-  window.gui().getContainer()->leftMousePressed(point);
-  window.gui().getContainer()->leftMouseReleased(point);
-  window.update(model, 0, 10);
-  auto selector = window.gui().get<tgui::ChildWindow>("stream_selector");
-  auto choices = selector->get<tgui::ScrollablePanel>("stream_choices");
-  EXPECT_LT(choices->getWidgets().size(), 25U);
+  auto selector = window.gui().get<tgui::Panel>("message_ids");
+  ASSERT_TRUE(selector);
+  auto choices = selector->get<tgui::ScrollablePanel>("id_choices");
+  ASSERT_TRUE(choices);
+  const auto choice_bound = 2U * (static_cast<size_t>(choices->getSize().y / 48.f) + 3U);
+  EXPECT_LE(choices->getWidgets().size(), choice_bound);
   choices->getVerticalScrollbar()->setValue(choices->getVerticalScrollbar()->getMaximum());
   window.update(model, 0, 10);
   auto last = choices->get<tgui::CheckBox>("choice4095");
   ASSERT_TRUE(last);
   EXPECT_NE(last->getText().find("00000FFF"), tgui::String::npos);
-  EXPECT_LT(choices->getWidgets().size(), 25U);
-  point = last->getAbsolutePosition() + tgui::Vector2f{5, 5};
+  EXPECT_LE(choices->getWidgets().size(), choice_bound);
+  auto point = last->getAbsolutePosition() + tgui::Vector2f{5, 5};
   window.gui().getContainer()->leftMousePressed(point);
   window.gui().getContainer()->leftMouseReleased(point);
   window.update(model, 0, 10);

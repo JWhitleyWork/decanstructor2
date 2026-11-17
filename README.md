@@ -5,7 +5,7 @@ The supported distro targets are Humble, Jazzy, Kilted, Lyrical, and Rolling.
 
 ## Monitor
 
-![DeCANstructor2 graphite interface showing a classic CAN row and two complete CAN FD byte matrices](docs/screenshots/monitor.png)
+![DeCANstructor2 monitor showing CAN rows, MESSAGE IDS sidebar, and FRAME METADATA below the table](docs/screenshots/monitor.png)
 
 *Actual application capture using synthetic ROS messages, not a design mockup.*
 
@@ -17,35 +17,37 @@ The table is designed for spotting payload changes without opening an inspector:
 - **Change highlighting:** individual bytes turn amber for one second after a
   change. Small hexadecimal row offsets identify positions within an FD payload.
 - **Frame metadata:** select a row to see its source, ID, format and flags in the
-  sidebar; the payload stays in the table.
+  horizontal **FRAME METADATA** panel below the table; the payload stays in the table.
 
 Count and mean receipt interval remain alongside each payload. The interval is
 measured with a steady clock and is not a bus timestamp. Scroll through longer
-stream lists without collapsing FD payloads. Press **Escape**, close the window,
+message rows without collapsing FD payloads. Press **Escape**, close the window,
 or use **Ctrl+C** in the launching terminal to exit.
 
-### Stream visibility and ID sorting
+### MESSAGE IDS and ID sorting
 
-Open **Streams...** for a scrollable checklist of known streams. Uncheck an entry
-to hide it, or use **Show all / Hide all** for the streams currently known.
-Hidden streams keep receiving: showing one again reveals its latest payload,
-count and timing, without restarting the byte-change highlight timer. A newly
-discovered stream starts visible, even after **Hide all**. Visibility choices
-last for the current application session only.
+The permanent **MESSAGE IDS** sidebar on the right contains a scrollable
+checklist of known message identities. Uncheck an entry to hide its row, or use
+**Show all / Hide all** for the identities currently known. Hidden entries keep
+receiving: showing one again reveals its latest payload, count and timing,
+without restarting the byte-change highlight timer. A newly discovered identity
+starts visible, even after **Hide all**. Visibility choices last for the current
+application session only.
 
 Each checklist entry identifies the source, CAN ID, classic/FD format and flags;
-hover for its complete label. Streams sharing an ID remain independently
+hover for its complete label. Entries sharing an ID remain independently
 selectable when their source, flags or format differ. The status bar reports
-visible/total streams, and an all-hidden view explains how to show them again.
+visible/total message IDs, and an all-hidden view explains how to show them again.
 
 The table starts in ascending **numeric CAN ID** order. Click the **ID ^ / ID v**
-header to reverse the ID direction; equal-ID streams keep a deterministic order
-by source and remaining identity fields. Sorting or hiding another stream keeps
-the selected stream's metadata. Hiding the selected stream clears the selection;
-showing it again does not select it automatically. Explicit sort/visibility
-changes scroll the table to the top.
+header to reverse the ID direction; equal-ID entries keep a deterministic order
+by source and remaining identity fields. Sorting or hiding another entry keeps
+the selected row's metadata in the horizontal **FRAME METADATA** panel below the
+table. Hiding the selected row clears the selection; showing it again does not
+select it automatically. Explicit sort/visibility changes scroll the table to the
+top.
 
-These controls affect the display only: subscriptions and the 4096-stream limit
+These controls affect the display only: subscriptions and the 4096-identity limit
 are unchanged, and every visible FD row retains its complete inline matrix.
 
 ## Build
@@ -76,9 +78,10 @@ colcon test-result --verbose
 
 The CI container additionally runs an installed-app graphical smoke test under
 Xvfb using `tools/run-tests.sh`; its image includes `xdotool` and ImageMagick.
-It publishes a classic stream and two distinct 64-byte FD streams, and captures
-the default and resized windows for visual inspection. The stream-count check
-does not verify the appearance or contents of those screenshots.
+It publishes one classic and two distinct 64-byte FD message identities, and
+captures default and narrow windows in visible, hidden and restored states for
+visual inspection. The message-ID count check does not verify the appearance or
+contents of those screenshots.
 
 The manifest currently pins the small SFML 2/3 compatibility fix on the vendor
 fork because write access to the upstream vendor is not available. TGUI remains
@@ -99,15 +102,16 @@ ros2 run decanstructor2 decanstructor2_node_exe --ros-args -p classic_topic:=can
 ```
 
 Both subscriptions use best-effort QoS. Classic frames support up to 8 data
-bytes and CAN-FD frames up to 64. A row identifies a stream by topic,
+bytes and CAN-FD frames up to 64. A row identifies a message by topic,
 `header.frame_id`, CAN ID, flags and classic/FD format. It displays the receive
 count and mean interval between receptions measured with a steady clock.
 The graphite-themed table keeps classic rows compact and shows every FD payload
 in its row as an 8-by-8 byte matrix, with placeholders for unused bytes. Bytes
-changed within the last second have an amber highlight. The details panel shows
-metadata only; selecting a frame is not needed to see its payload. The monitor
-holds at most 4096 streams: once full, new streams are rejected while existing
-streams continue.
+changed within the last second have an amber highlight. The horizontal
+**FRAME METADATA** panel below the table shows metadata only; selecting a frame
+is not needed to see its payload. The monitor
+holds at most 4096 distinct message identities: once full, new identities are
+rejected while existing ones continue.
 
 ## Development checks
 

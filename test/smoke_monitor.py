@@ -96,19 +96,42 @@ def main():
                         fd_pub.publish(fd_a)
                         fd_pub.publish(fd_b)
                         time.sleep(0.03)
-                    wait_until(lambda: '3 streams' in subprocess.check_output(
+                    wait_until(lambda: '3 message IDs' in subprocess.check_output(
                         ['xdotool', 'getwindowname', window], text=True))
                     if close_mode == 'escape':
-                        # Xvfb has no window manager: SFML 3 may place the client
-                        # partly off-screen, and ImageMagick clips its capture.
-                        subprocess.run(['xdotool', 'windowmove', window, '0', '0'], check=True)
-                        # Allow the exposed portion to be repainted before capture.
-                        time.sleep(0.2)
-                        capture(window, output / 'monitor.png', (1280, 800))
-                        subprocess.run(
-                            ['xdotool', 'windowsize', window, '1000', '600'], check=True)
-                        time.sleep(0.2)
-                        capture(window, output / 'monitor-resized.png', (1000, 600))
+                        # With no window manager, keep the client fully on-screen and
+                        # click physical screen coordinates inside the sidebar.
+                        for width, height, suffix in (
+                            (1280, 800, ''), (1000, 600, '-resized')
+                        ):
+                            subprocess.run(
+                                ['xdotool', 'windowsize', window, str(width), str(height)],
+                                check=True)
+                            subprocess.run(['xdotool', 'windowmove', window, '0', '0'],
+                                           check=True)
+                            time.sleep(0.2)
+                            sidebar_x = width - 258
+
+                            def click(x, y):
+                                subprocess.run(
+                                    ['xdotool', 'mousemove', '--sync', str(x), str(y),
+                                     'click', '1'], check=True)
+                                time.sleep(0.2)
+
+                            click(30, 92)  # Select the classic row for metadata inspection
+                            capture(window, output / f'monitor{suffix}.png', (width, height))
+                            click(sidebar_x + 124 + 54, 55 + 36 + 15)  # Hide all
+                            capture(window, output / f'monitor{suffix}-hidden.png',
+                                    (width, height))
+                            click(sidebar_x + 8 + 54, 55 + 36 + 15)  # Show all
+                            capture(window, output / f'monitor{suffix}-restored.png',
+                                    (width, height))
+                            click(sidebar_x + 13, 55 + 88)  # First checkbox
+                            capture(window, output / f'monitor{suffix}-first-hidden.png',
+                                    (width, height))
+                            click(sidebar_x + 13, 55 + 88)
+                            capture(window, output / f'monitor{suffix}-first-restored.png',
+                                    (width, height))
                         # Targeted XSendEvent does not change physical key state; the
                         # window may close on keydown, so do not send it a keyup.
                         subprocess.run(
@@ -117,7 +140,7 @@ def main():
                         os.killpg(process.pid, signal.SIGINT)
                     result = process.wait(timeout=5)
                     assert result == 0, f'{close_mode} shutdown returned {result}'
-                    print('PASS: installed GUI received three streams of both message types '
+                    print('PASS: installed GUI received three message IDs of both message types '
                           f'and exited via {close_mode}')
                 finally:
                     if process.poll() is None:

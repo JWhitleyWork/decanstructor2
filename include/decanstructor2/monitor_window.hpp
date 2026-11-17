@@ -46,9 +46,10 @@ private:
   tgui::Gui gui_;
   tgui::ScrollablePanel::Ptr frames_;
   tgui::Label::Ptr status_;
-  tgui::Label::Ptr selected_;
+  tgui::Panel::Ptr metadata_;
+  tgui::Label::Ptr selection_hint_;
+  std::array<tgui::Label::Ptr, 5> metadata_values_;
   tgui::Label::Ptr empty_;
-  tgui::ChildWindow::Ptr selector_;
   tgui::ScrollablePanel::Ptr choices_;
   tgui::Button::Ptr sort_;
   StreamView view_;

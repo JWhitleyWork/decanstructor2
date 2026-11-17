@@ -20,6 +20,7 @@
 #include "decanstructor2/monitor_window.hpp"
 #include <algorithm>
 #include <iomanip>
+#include <memory>
 #include <sstream>
 #include <string>
 
@@ -33,6 +34,9 @@ constexpr float classic_height = 32, fd_height = 190;
 const char * field_names[] = {"source", "id", "format", "length", "count", "interval"};
 const char * field_positions[] = {"1%", "17%", "31%", "39%", "82%", "90%"};
 const char * field_widths[] = {"15%", "14%", "8%", "5%", "8%", "10%"};
+const char * metadata_names[] = {"id", "source", "format", "flags", "brs_esi"};
+const char * metadata_positions[] = {"1%", "17%", "50%", "67%", "82%"};
+const char * metadata_widths[] = {"15%", "32%", "16%", "14%", "17%"};
 
 sf::VideoMode monitor_video_mode()
 {
@@ -73,36 +77,30 @@ MonitorWindow::MonitorWindow()
   mode->getRenderer()->setTextColor(muted);
   mode->setPosition("100% - 220", 18);
   gui_.add(mode);
-  auto streams = tgui::Button::create("Streams...");
-  streams->setPosition(220, 12);
-  streams->setSize(105, 30);
-  streams->onPress([this] {selector_->setVisible(!selector_->isVisible());});
-  gui_.add(streams, "streams_toggle");
-
-  selector_ = tgui::ChildWindow::create("Streams");
-  selector_->setPosition(220, 48);
-  selector_->setSize(500, 450);
-  selector_->setVisible(false);
-  selector_->getRenderer()->setBackgroundColor(tgui::Color(33, 36, 38));
-  selector_->getRenderer()->setTitleBarColor(tgui::Color(43, 47, 50));
-  selector_->getRenderer()->setTitleColor(text);
-  selector_->getRenderer()->setBorderColor(tgui::Color(73, 82, 89));
-  selector_->setCloseBehavior(tgui::ChildWindow::CloseBehavior::Hide);
+  auto message_ids = tgui::Panel::create();
+  message_ids->setPosition("100% - 258", 55);
+  message_ids->setSize(246, "100% - 97");
+  message_ids->getRenderer()->setBackgroundColor(tgui::Color(33, 36, 38));
+  auto ids_title = label("MESSAGE IDS", 15);
+  ids_title->setPosition(8, 9);
+  ids_title->getRenderer()->setTextColor(muted);
+  message_ids->add(ids_title, "title");
   auto show = tgui::Button::create("Show all");
-  show->setPosition(8, 8);
-  show->setSize(100, 30);
+  show->setPosition(8, 36);
+  show->setSize(108, 30);
   show->onPress([this] {set_known_visible(true);});
-  selector_->add(show, "show_all");
+  message_ids->add(show, "show_all");
   auto hide = tgui::Button::create("Hide all");
-  hide->setPosition(116, 8);
-  hide->setSize(100, 30);
+  hide->setPosition(124, 36);
+  hide->setSize(108, 30);
   hide->onPress([this] {set_known_visible(false);});
-  selector_->add(hide, "hide_all");
+  message_ids->add(hide, "hide_all");
   choices_ = tgui::ScrollablePanel::create();
-  choices_->setPosition(8, 46);
-  choices_->setSize("100% - 16", "100% - 54");
+  choices_->setPosition(8, 76);
+  choices_->setSize("100% - 16", "100% - 84");
   choices_->getRenderer()->setBackgroundColor(tgui::Color(29, 32, 34));
-  selector_->add(choices_, "stream_choices");
+  message_ids->add(choices_, "id_choices");
+  gui_.add(message_ids, "message_ids");
 
   auto columns = tgui::Panel::create();
   columns->setPosition(12, 55);
@@ -140,7 +138,7 @@ MonitorWindow::MonitorWindow()
   gui_.add(columns, "columns");
   frames_ = tgui::ScrollablePanel::create();
   frames_->setPosition(12, 84);
-  frames_->setSize("100% - 282", "100% - 126");
+  frames_->setSize("100% - 282", "100% - 188");
   frames_->getRenderer()->setBackgroundColor(tgui::Color(29, 32, 34));
   frames_->getHorizontalScrollbar()->setPolicy(tgui::Scrollbar::Policy::Automatic);
   auto scrollbar = tgui::Scrollbar::create();
@@ -151,24 +149,44 @@ MonitorWindow::MonitorWindow()
   scrollbar->getRenderer()->setArrowColor(muted);
   frames_->getRenderer()->setScrollbar(scrollbar->getRenderer()->getData());
   gui_.add(frames_, "frames");
-  empty_ = label("No visible streams. Open Streams... to show them; reception continues.");
+  empty_ = label("All message IDs are hidden. Use Show all in MESSAGE IDS; reception continues.");
   empty_->setPosition(25, 100);
+  empty_->setSize("100% - 320", 48);
   empty_->setVisible(false);
   gui_.add(empty_, "empty_hint");
 
-  auto detail_title = label("FRAME METADATA", 15);
-  detail_title->setPosition("100% - 252", 64);
+  metadata_ = tgui::Panel::create();
+  metadata_->setPosition(12, "100% - 100");
+  metadata_->setSize("100% - 282", 64);
+  metadata_->getRenderer()->setBackgroundColor(tgui::Color(33, 36, 38));
+  auto detail_title = label("FRAME METADATA", 12);
+  detail_title->setPosition(8, 4);
   detail_title->getRenderer()->setTextColor(muted);
-  gui_.add(detail_title);
-  selected_ = label("Select a frame", 14);
-  selected_->setPosition("100% - 252", 99);
-  selected_->setSize(240, "100% - 150");
-  gui_.add(selected_, "selected");
+  metadata_->add(detail_title, "title");
+  const char * metadata_headings[] = {"ID", "SOURCE", "FORMAT", "FLAGS", "BRS / ESI"};
+  for (size_t n = 0; n < metadata_values_.size(); ++n) {
+    auto heading = label(metadata_headings[n], 10);
+    heading->setPosition(metadata_positions[n], 23);
+    heading->setSize(metadata_widths[n], 14);
+    heading->getRenderer()->setTextColor(muted);
+    metadata_->add(heading, std::string(metadata_names[n]) + "_heading");
+    auto value = label("", 14);
+    value->setPosition(metadata_positions[n], 39);
+    value->setSize(metadata_widths[n], 22);
+    metadata_->add(value, metadata_names[n]);
+    metadata_values_[n] = value;
+  }
+  auto source_tooltip = label("");
+  source_tooltip->getRenderer()->setBackgroundColor(cell);
+  metadata_values_[1]->setToolTip(source_tooltip);
+  selection_hint_ = label("Select a frame", 14);
+  selection_hint_->setPosition(8, 35);
+  metadata_->add(selection_hint_, "selection_hint");
+  gui_.add(metadata_, "metadata");
   status_ = label("", 13);
   status_->setPosition(18, "100% - 29");
   status_->getRenderer()->setTextColor(muted);
   gui_.add(status_, "status");
-  gui_.add(selector_, "stream_selector");
 }
 
 bool MonitorWindow::process_events()
@@ -211,7 +229,7 @@ void MonitorWindow::set_known_visible(bool visible)
 
 void MonitorWindow::update(const FrameModel & model, uint64_t rejected, int64_t now_ns)
 {
-  window_.setTitle("DeCANstructor2 - " + std::to_string(model.rows().size()) + " streams");
+  window_.setTitle("DeCANstructor2 - " + std::to_string(model.rows().size()) + " message IDs");
   const bool rebuild = projection_dirty_ || known_count_ != model.rows().size();
   if (rebuild) {
     row_keys_ = view_.visible_keys(model);
@@ -233,13 +251,13 @@ void MonitorWindow::update(const FrameModel & model, uint64_t rejected, int64_t 
     projection_dirty_ = false;
     sort_->setText(view_.sort_direction() == IdSortDirection::Ascending ? "ID ^" : "ID v");
   }
-  const auto status_text = "Streams: " + std::to_string(row_keys_.size()) + "/" +
+  const auto status_text = "Message IDs: " + std::to_string(row_keys_.size()) + "/" +
     std::to_string(model.rows().size()) +
     "    |    Rejected: " + std::to_string(rejected) +
     "    |    Receipt interval (steady clock)    |    Amber: changed within 1s";
   status_->setText(status_text);
   empty_->setVisible(row_keys_.empty() && !model.rows().empty());
-  constexpr float choice_height = 32;
+  constexpr float choice_height = 48;
   choices_->setContentSize(
     {std::max(1.f, choices_->getSize().x - 20),
       std::max(1.f, choice_height * choice_keys_.size())});
@@ -257,8 +275,7 @@ void MonitorWindow::update(const FrameModel & model, uint64_t rejected, int64_t 
     for (size_t index = cb; index < ce; ++index) {
       const auto key = choice_keys_[index];
       const auto caption = "0x" + hex(key.id, key.extended || key.error ? 8 : 3) +
-        "  " + (key.format == FrameFormat::FD ? "FD" : "CAN") + "  " + flags(key) +
-        "  " + key.source;
+        "  " + (key.format == FrameFormat::FD ? "FD" : "CAN") + "  " + flags(key);
       auto choice = tgui::CheckBox::create(caption);
       choice->setPosition(5, index * choice_height + 4);
       choice->setSize(22, 22);
@@ -266,7 +283,7 @@ void MonitorWindow::update(const FrameModel & model, uint64_t rejected, int64_t 
       choice->setChecked(view_.is_visible(key));
       choice->getRenderer()->setTextColor(text);
       choice->getRenderer()->setTextColorHover(text);
-      auto tooltip = label(caption);
+      auto tooltip = label(caption + "\n" + key.source);
       tooltip->getRenderer()->setBackgroundColor(cell);
       choice->setToolTip(tooltip);
       choice->onChange(
@@ -276,6 +293,12 @@ void MonitorWindow::update(const FrameModel & model, uint64_t rejected, int64_t 
           frames_->getVerticalScrollbar()->setValue(0);
         });
       choices_->add(choice, "choice" + std::to_string(index));
+      auto source = label(key.source, 12);
+      source->setPosition(32, index * choice_height + 27);
+      source->setSize("100% - 52", 18);
+      source->getRenderer()->setTextColor(muted);
+      source->setToolTip(tooltip);
+      choices_->add(source, "source" + std::to_string(index));
     }
   }
   const float total = row_keys_.empty() ? 0 : row_offsets_.back() +
@@ -364,17 +387,24 @@ void MonitorWindow::update(const FrameModel & model, uint64_t rejected, int64_t 
       byte->getRenderer()->setBackgroundColor(changed ? amber : cell);
     }
   }
+  selection_hint_->setVisible(!selected_key_);
+  for (size_t n = 0; n < metadata_values_.size(); ++n) {
+    metadata_values_[n]->setVisible(selected_key_.has_value());
+    metadata_->get<tgui::Label>(std::string(metadata_names[n]) + "_heading")->setVisible(
+      selected_key_.has_value());
+  }
   if (selected_key_) {
     const auto & state = model.rows().at(*selected_key_);
     const auto & frame = state.frame;
     const auto id_text = hex(frame.key.id, frame.key.extended || frame.key.error ? 8 : 3);
-    const auto metadata = "ID\n0x" + id_text +
-      "\n\nTOPIC\n" + frame.key.source + "\n\nFORMAT\n" +
-      (frame.key.format == FrameFormat::FD ? "CAN FD" : "Classic CAN") + "\n\nFLAGS\n" +
-      flags(frame.key) + "\n\nBRS / ESI\nUnavailable";
-    selected_->setText(metadata);
-  } else {
-    selected_->setText("Select a frame");
+    const std::array<std::string, 5> values = {"0x" + id_text, frame.key.source,
+      frame.key.format == FrameFormat::FD ? "CAN FD" : "Classic CAN", flags(frame.key),
+      "Unavailable"};
+    for (size_t n = 0; n < values.size(); ++n) {
+      metadata_values_[n]->setText(values[n]);
+    }
+    std::static_pointer_cast<tgui::Label>(metadata_values_[1]->getToolTip())->setText(
+      frame.key.source);
   }
 }
 
